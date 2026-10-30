@@ -125,14 +125,14 @@ export function attach(app) {
       box.innerHTML = `
         <div class="th-row">
           <span class="colour" data-colour="${t.color}" aria-hidden="true"></span>
-          <span class="ticon" aria-hidden="true">${info.icon}</span>
+          <span class="ticon" aria-hidden="true" data-icon="${info.icon}"></span>
           <b><i class="tnum">${String(i + 2).padStart(2, '0')}</i> <span class="tname" contenteditable="true" spellcheck="false">${t.name}</span></b>
-          <button class="ic mini" type="button" aria-label="More actions" data-track-menu="${t.id}">&#8942;</button>
+          <button class="ic mini" type="button" aria-label="More actions" data-track-menu="${t.id}"><span data-icon="dots-v" aria-hidden="true"></span></button>
           <span class="th-spacer"></span>
-          <button class="arm" type="button" aria-label="Arm track for recording" data-arm="${t.id}" aria-pressed="${t.armed}">&#9679;</button>
+          <button class="arm" type="button" aria-label="Arm track for recording" data-arm="${t.id}" aria-pressed="${t.armed}"><span data-icon="record" aria-hidden="true"></span></button>
           <button class="ms" type="button" aria-label="Mute" data-mute="${t.id}" aria-pressed="${t.mute}">M</button>
           <button class="ms" type="button" aria-label="Solo" data-solo="${t.id}" aria-pressed="${t.solo}">S</button>
-          <span class="chev" aria-hidden="true">&#8250;</span>
+          <span class="chev" aria-hidden="true" data-icon="chevron"></span>
         </div>
         <div class="th-row">
           <button class="fx" type="button" aria-label="Add a plug-in" data-fx="${t.id}">+ Fx</button>
@@ -240,7 +240,7 @@ export function attach(app) {
   // add track
   $('track-types').innerHTML = tracks.TRACK_TYPES.filter(t => t.picker).map(t =>
     `<button class="type" type="button" role="listitem" data-type="${t.slug}">
-       <span class="ticon" aria-hidden="true">${t.glyph}</span><span><b>${t.label}</b><i>${t.hint}</i></span>
+       <span class="ticon" aria-hidden="true" data-icon="${t.icon}"></span><span><b>${t.label}</b><i>${t.hint}</i></span>
        ${t.midi ? '<em class="midi">MIDI</em>' : ''}</button>`).join('')
   $('track-types').addEventListener('click', (e) => {
     const b = e.target.closest('[data-type]')
@@ -383,8 +383,30 @@ export function attach(app) {
 
   function drawRoll() { renderRoll($('roll'), activeRoll(), { rows: ROWS, preview: false }) }
 
+  const PITCH_NAMES = ['C', 'C\u266F', 'D', 'D\u266F', 'E', 'F', 'F\u266F', 'G', 'G\u266F', 'A', 'A\u266F', 'B']
+
+  // A pitch gutter down the left edge, so the grid reads as a keyboard.
+  function drawPitchLabels(g, W, H, rows, lowMidi) {
+    g.save()
+    g.fillStyle = 'rgba(6, 9, 10, 0.88)'
+    g.fillRect(0, 0, 26, H)
+    g.fillStyle = '#a3abaf'
+    g.font = '10px ui-monospace, Menlo, monospace'
+    g.textBaseline = 'middle'
+    const rowH = H / rows
+    for (let i = 0; i < rows; i += 1) {
+      const midi = lowMidi + (rows - 1 - i)
+      if (rowH < 12 && i % 2 === 1) continue
+      g.fillText(`${PITCH_NAMES[midi % 12]}${Math.floor(midi / 12) - 1}`, 4, i * rowH + rowH / 2)
+    }
+    g.restore()
+  }
+
   function renderRoll(cv, r, opts = {}) {
     if (!cv) return
+    // match the backing store to the box, so a dock resize never clips the grid
+    if (cv.clientWidth && cv.width !== cv.clientWidth) cv.width = cv.clientWidth
+    if (cv.clientHeight && cv.height !== cv.clientHeight) cv.height = cv.clientHeight
     const g = cv.getContext('2d')
     const W = cv.width
     const H = cv.height
@@ -398,37 +420,41 @@ export function attach(app) {
       g.fillStyle = '#192124'
       for (let b = 0; b <= 32; b += 4) g.fillRect(b * (W / 32), 0, 1, H)
       const beatsPerSecond = Number($('in-bpm').value) / 60
-      const low = 48
+      const lowest = state.notes.length ? Math.min(...state.notes.map(n => Math.floor(n.midi))) : 48
+      const low = Math.max(24, Math.min(48, lowest - 2))
       state.notes.forEach((n) => {
         const row = 23 - (Math.round(n.midi) - low)
         if (row < 0 || row > 23) return
-        const x = (n.start * beatsPerSecond / 32) * W
+        const x = (n.start * beatsPerSecond / 32) * (W - 26)
         const w = Math.max(3, (n.dur * beatsPerSecond / 32) * W)
         const flat = Math.abs(n.cents || 0) < 8
         g.fillStyle = flat ? '#3f8f99' : '#6fa8ff'
-        g.fillRect(x, row * (H / 24) + 2, w, Math.max(2, H / 24 - 4))
+        g.fillRect(x + 26, row * (H / 24) + 2, w, Math.max(2, H / 24 - 4))
       })
+      drawPitchLabels(g, W, H, 24, low)
       return
     }
     const rowH = H / rows
-    const beatW = W / r.lengthBeats
+    const gut = opts.preview ? 0 : 26
+    const beatW = (W - gut) / r.lengthBeats
     for (let row = 0; row < rows; row++) {
       const midi = r.lowMidi + (rows - 1 - row)
       g.fillStyle = [1, 3, 6, 8, 10].includes(midi % 12) ? '#0a0e10' : '#0d1315'
-      g.fillRect(0, row * rowH, W, rowH)
+      g.fillRect(gut, row * rowH, W - gut, rowH)
       g.fillStyle = '#1b2225'
-      g.fillRect(0, row * rowH + rowH - 1, W, 1)
+      g.fillRect(gut, row * rowH + rowH - 1, W - gut, 1)
     }
     for (let b = 0; b <= r.lengthBeats; b += 1) {
       g.fillStyle = b % 4 === 0 ? '#243034' : '#192124'
-      g.fillRect(b * beatW, 0, 1, H)
+      g.fillRect(gut + b * beatW, 0, 1, H)
     }
     r.notes.forEach((n) => {
       const row = rows - 1 - (n.midi - r.lowMidi)
       if (row < 0 || row >= rows) return
       g.fillStyle = opts.preview ? '#4e86c9' : '#6fa8ff'
-      g.fillRect(n.start * beatW, row * rowH + 2, Math.max(3, n.dur * beatW), Math.max(2, rowH - 4))
+      g.fillRect(gut + n.start * beatW, row * rowH + 2, Math.max(3, n.dur * beatW), Math.max(2, rowH - 4))
     })
+    if (gut) drawPitchLabels(g, W, H, rows, r.lowMidi)
   }
 
   function refreshRollUi() {
@@ -448,7 +474,9 @@ export function attach(app) {
   const rollPoint = (e) => {
     const r = activeRoll()
     const box = $('roll').getBoundingClientRect()
-    const beat = Math.min(r.lengthBeats - 0.05, Math.max(0, ((e.clientX - box.left) / box.width) * r.lengthBeats))
+    const GUT = 26
+    const x = e.clientX - box.left - GUT
+    const beat = Math.min(r.lengthBeats - 0.05, Math.max(0, (x / (box.width - GUT)) * r.lengthBeats))
     const row = Math.floor(((e.clientY - box.top) / box.height) * ROWS)
     return { beat, midi: r.lowMidi + (ROWS - 1 - row) }
   }
@@ -583,8 +611,8 @@ export function attach(app) {
       row.setAttribute('role', 'listitem')
       const spec = fx.FX_LIST.find(e => e.slug === effect.slug)
       row.innerHTML = `<b>${spec.name}</b><span class="lit">${effect.bypass ? 'bypassed' : 'active'}</span>
-        <button class="ic mini" type="button" aria-label="Edit ${spec.name}" data-edit="${effect.id}">&#9998;</button>
-        <button class="ic mini" type="button" aria-label="Bypass ${spec.name}" data-bypass="${effect.id}">&#9678;</button>`
+        <button class="ic mini" type="button" aria-label="Edit ${spec.name}" data-edit="${effect.id}"><span data-icon="edit" aria-hidden="true"></span></button>
+        <button class="ic mini" type="button" aria-label="Bypass ${spec.name}" data-bypass="${effect.id}"><span data-icon="bypass" aria-hidden="true"></span></button>`
       host.append(row)
     })
     if (!t.chain.effects.some(e => e.slug !== fx.LIMITER_SLUG)) {
@@ -861,7 +889,7 @@ export function attach(app) {
     $('sound-list').innerHTML = list.map(s =>
       `<div class="snd${state.sound?.slug === s.slug ? ' on' : ''}" role="listitem">
         <b>${escapeHtml(s.name)}</b><span>${s.bpm} bpm · ${s.key}</span>
-        <button class="ic mini" type="button" aria-label="Favourite ${escapeHtml(s.name)}" data-fav="${s.slug}">${isFav(s.slug) ? '♥' : '♡'}</button></div>`).join('')
+        <button class="ic mini${isFav(s.slug) ? ' fav' : ''}" type="button" aria-label="Favourite ${escapeHtml(s.name)}" data-fav="${s.slug}"><span data-icon="heart" aria-hidden="true"></span></button></div>`).join('')
     $('sound-count').textContent = `${list.length} samples`
   }
   const isFav = (slug) => library.isFavourite(state.favourites, slug)

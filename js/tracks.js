@@ -19,8 +19,8 @@ export const TRACK_TYPES = Object.freeze([
   Object.freeze({ slug: 'instrument', glyph: '🎹', label: 'Virtual instruments', icon: 'keys', color: '#3fa9a0', hint: 'Record kits, keys and more', midi: true, picker: true }),
   Object.freeze({ slug: 'drums', glyph: '🥁', label: 'Drum Machine', icon: 'drum', color: '#e0813f', hint: 'Create beats in seconds', midi: true, picker: true }),
   Object.freeze({ slug: 'sampler', glyph: '〰', label: 'Sampler', icon: 'wave', color: '#56a7e0', hint: 'Turn any sound into an instrument', midi: true, picker: true }),
-  Object.freeze({ slug: 'guitar', glyph: '🎸', label: 'Guitar', icon: 'plug', color: '#c9a227', hint: 'Jam with Amps + FX', midi: false, picker: true }),
-  Object.freeze({ slug: 'bass', glyph: '🎻', label: 'Bass', icon: 'loop', color: '#5dbb63', hint: 'Find your signature tone', midi: false, picker: true }),
+  Object.freeze({ slug: 'guitar', glyph: '🎸', label: 'Guitar', icon: 'guitar', color: '#c9a227', hint: 'Jam with Amps + FX', midi: false, picker: true }),
+  Object.freeze({ slug: 'bass', glyph: '🎻', label: 'Bass', icon: 'bass', color: '#5dbb63', hint: 'Find your signature tone', midi: false, picker: true }),
   Object.freeze({ slug: 'loop', glyph: '🔁', label: 'Loop', icon: 'repeat', color: '#c94f8c', hint: 'Repeat an audio phrase', midi: false, picker: false }),
 ])
 

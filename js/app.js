@@ -12,6 +12,9 @@ import * as automix from './automix.js'
 import { masterChain } from './master.js'
 import { encodeWav } from './wav.js'
 import { attach as attachStudio } from './studio.js'
+import * as icons from './icons.js'
+import { install as installPanels } from './panels.js'
+import { install as installTimeline } from './timeline.js'
 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const DIVISION = 4
@@ -844,6 +847,12 @@ function boot() {
   }
   const app = { state, log, status, openPanel, playheadSeconds, syncTuning, renderNotes, renderBands, exportWav }
   state.studio = attachStudio(app)
+  installPanels({ state, log })
+  installTimeline({ state, log })
+  icons.hydrate()
+  new MutationObserver((rows) => rows.forEach((r) => r.addedNodes.forEach((n) => {
+    if (n.nodeType === 1) icons.hydrate(n)
+  }))).observe(document.body, { childList: true, subtree: true })
   $('lane').addEventListener('pointerdown', setPlayheadFromEvent)
   $('lane').addEventListener('scroll', () => { const rr = $('ruler-row'); if (rr) rr.scrollLeft = $('lane').scrollLeft })
   $('ruler').parentElement.classList.add('ruler-scroll')
