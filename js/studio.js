@@ -238,15 +238,16 @@ export function attach(app) {
   function syncAll() { state.tracks.forEach(syncTrackDom); syncAudibility() }
 
   // add track
-  $('track-types').innerHTML = tracks.TRACK_TYPES.map(t =>
+  $('track-types').innerHTML = tracks.TRACK_TYPES.filter(t => t.picker).map(t =>
     `<button class="type" type="button" role="listitem" data-type="${t.slug}">
-       <span aria-hidden="true">${t.icon}</span><span><b>${t.label}</b><i>${t.hint}</i></span></button>`).join('')
+       <span class="ticon" aria-hidden="true">${t.glyph}</span><span><b>${t.label}</b><i>${t.hint}</i></span>
+       ${t.midi ? '<em class="midi">MIDI</em>' : ''}</button>`).join('')
   $('track-types').addEventListener('click', (e) => {
     const b = e.target.closest('[data-type]')
     if (!b) return
     const t = tracks.addTrack(state.tracks, { type: b.dataset.type, name: tracks.typeInfo(b.dataset.type).label })
     t.chain = fx.createChain()
-    if (t.type === 'instrument') state.rolls.set(t.id, roll.createRoll())
+    if (tracks.typeInfo(t.type).midi) state.rolls.set(t.id, roll.createRoll())
     state.active = t.id
     if (t.type === 'drums') state.patterns.set(t.id, drums.createPattern())
     closeModal($('m-addtrack'))
@@ -539,11 +540,43 @@ export function attach(app) {
     closeModal($('m-fx'))
   })
   $('btn-fx-add').addEventListener('click', () => openModal('fx'))
+  $('btn-fx-preset-none').addEventListener('click', () => {
+    const t = findTrack(state.active)
+    if (!t) return
+    t.chain = fx.createChain({ isMember: state.member })
+    renderChain(t)
+    syncTrackDom(t)
+    app.log('fx preset: none')
+  })
+  $('btn-fx-preset-save').addEventListener('click', () => {
+    const t = findTrack(state.active)
+    if (!t) return
+    localStorage.setItem('apollo.fxpreset', JSON.stringify(t.chain.effects.map(e => ({ slug: e.slug, params: e.params }))))
+    app.log('fx preset saved')
+  })
+  $('in-fx-blend').addEventListener('input', (e) => { $('out-fx-blend').textContent = `${e.target.value} %` })
+  $('btn-fx-prompt').addEventListener('click', () => {
+    const t = findTrack(state.active)
+    if (!t) return
+    const words = (window.prompt('Describe the sound you want', 'wider, brighter vocal') || '').toLowerCase()
+    if (!words) return
+    const guess = words.includes('wider') || words.includes('brighter') ? 'comp' : words.includes('echo') ? 'delay' : 'eq3'
+    try {
+      const effect = fx.addEffect(t.chain, guess, { isMember: state.member })
+      renderChain(t)
+      syncTrackDom(t)
+      app.log(`fx prompt: ${words} → ${guess} ${effect.id}`)
+    } catch (err) { app.log(`fx prompt: ${err.message}`) }
+  })
   $('btn-fx-add').setAttribute('aria-label', 'Add an effect to the active track')
 
   function renderChain(t) {
     const host = $('fx-chain')
     host.innerHTML = ''
+    const used = t.chain.effects.filter(e => e.slug !== fx.LIMITER_SLUG).length
+    const cap = t.chain.capacity ?? 8
+    $('fx-capacity').textContent = used >= cap ? 'Maximum amount of effects reached' : `${used} / ${cap}`
+    $('btn-fx-add').disabled = used >= cap
     t.chain.effects.forEach((effect) => {
       const row = document.createElement('div')
       row.className = `fxrow${effect.bypass ? ' off' : ''}`
@@ -632,8 +665,8 @@ export function attach(app) {
   }
 
   // ---------------------------------------------------------------- AutoPitch
-  $('ap-presets').innerHTML = autopitch.PRESETS.map(p =>
-    `<button type="button" data-ap="${p.slug}" class="${p.tier === 'membership' ? 'locked' : ''}">${p.name}</button>`).join('')
+  $('ap-presets').innerHTML = autopitch.PRESETS.map((p, i) =>
+    `<button type="button" data-ap="${p.slug}" class="${p.tier === 'membership' ? 'locked' : ''}">${p.name}${i === 0 ? '<em class="new">New</em>' : ''}</button>`).join('')
   $('tonic-grid').innerHTML = autopitch.TONIC_GRID.map(t =>
     `<button type="button" data-tonic="${t.pitchClass}" aria-label="${t.name}">${t.name}</button>`).join('')
   $('in-ap-scale').innerHTML = autopitch.SCALE_NAMES.map(n => `<option value="${n}">${n}</option>`).join('')
@@ -652,7 +685,7 @@ export function attach(app) {
     })
     $('in-ap-scale').value = s.scale
     $('in-ap-strength').value = String(Math.round(s.strength * 100))
-    $('out-ap-strength').textContent = `${Math.round(s.strength * 100)}%`
+    $('out-ap-strength').textContent = `${Math.round(s.strength * 100)} %`
   }
   $('ap-presets').addEventListener('click', (e) => {
     const b = e.target.closest('[data-ap]')
@@ -1050,7 +1083,7 @@ export function attach(app) {
     state,
     renderAll() { renderTrackList(); syncAll(); drawRoll(); renderSounds(); renderVersions() },
     drawRoll,
-    addTrack: (type) => { const t = tracks.addTrack(state.tracks, { type, name: tracks.typeInfo(type).label }); if (type === 'instrument') state.rolls.set(t.id, roll.createRoll()); if (type === 'drums') state.patterns.set(t.id, drums.createPattern()); renderTrackList(); return t.id },
+    addTrack: (type) => { const t = tracks.addTrack(state.tracks, { type, name: tracks.typeInfo(type).label }); if (tracks.typeInfo(type).midi) state.rolls.set(t.id, roll.createRoll()); if (type === 'drums') state.patterns.set(t.id, drums.createPattern()); renderTrackList(); return t.id },
     setActive(id) { state.active = id; renderChain(findTrack(id)); drawRoll() },
     chain: () => state.tracks.find(t => t.id === state.active)?.chain.effects,
     mixerOpen: () => { $('btn-mixer').click(); return !$('mixer').hidden },

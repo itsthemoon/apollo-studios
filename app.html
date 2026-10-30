@@ -245,7 +245,15 @@
     </section>
 
     <section class="panel" id="p-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
-      <div class="panel-head"><h2>Effects</h2><button id="btn-fx-add" class="pill" type="button">+ Add effect</button></div>
+      <div class="panel-head"><h2>Effects</h2><span id="fx-capacity" class="hint" role="status"></span>
+        <button id="btn-fx-add" class="pill" type="button">Add Effect</button></div>
+      <div class="fxpresets">
+        <span class="hint">Presets</span>
+        <button class="pill ghost tiny" type="button" id="btn-fx-preset-none">None</button>
+        <button class="pill ghost tiny" type="button" id="btn-fx-preset-save">Save</button>
+        <label class="blend">Blend <input id="in-fx-blend" type="range" min="0" max="100" value="100" aria-label="Effect blend"><output id="out-fx-blend">100 %</output></label>
+        <button class="pill ghost tiny ai-prompt" type="button" id="btn-fx-prompt"><em class="ai">AI</em> Generate With Prompt</button>
+      </div>
       <div id="fx-chain" class="fxchain" role="list" aria-label="Effect chain"></div>
       <div class="row">
         <label>Character <select id="in-character"></select></label>

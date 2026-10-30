@@ -39,9 +39,9 @@ const fresh = () => {
   return []
 }
 
-test('TRACK_TYPES ships the four required types with full metadata', () => {
-  eq(TRACK_TYPES.length, 4)
-  eq(TRACK_TYPES.map((t) => t.slug).join(','), 'voice,instrument,drums,loop')
+test('TRACK_TYPES ships the six picker types plus loop with full metadata', () => {
+  eq(TRACK_TYPES.length, 7)
+  eq(TRACK_TYPES.map((t) => t.slug).join(','), 'voice,instrument,drums,sampler,guitar,bass,loop')
   for (const t of TRACK_TYPES) {
     ok(typeof t.label === 'string' && t.label.length > 0, `${t.slug}: label`)
     ok(typeof t.icon === 'string' && t.icon.length > 0, `${t.slug}: icon`)
@@ -53,7 +53,7 @@ test('TRACK_TYPES and its entries are frozen', () => {
   ok(Object.isFrozen(TRACK_TYPES))
   ok(TRACK_TYPES.every((t) => Object.isFrozen(t)))
   ok(Object.isFrozen(TRACK_TYPE_SLUGS))
-  eq(TRACK_TYPE_SLUGS.length, 4)
+  eq(TRACK_TYPE_SLUGS.length, 7)
 })
 
 test('isTrackType and typeInfo resolve only real slugs', () => {
@@ -61,10 +61,10 @@ test('isTrackType and typeInfo resolve only real slugs', () => {
     ok(isTrackType(slug))
     eq(typeInfo(slug).slug, slug)
   }
-  eq(isTrackType('bass'), false)
+  eq(isTrackType('pad'), false)
   eq(isTrackType(''), false)
   eq(isTrackType(null), false)
-  eq(typeInfo('bass'), null)
+  eq(typeInfo('pad'), null)
 })
 
 test('clampDb pins the volume ceiling and floor', () => {
@@ -123,7 +123,7 @@ test('createTrack fills the whole shape with neutral defaults', () => {
   eq(track.id, 't1')
   eq(track.type, 'voice')
   eq(track.index, 2)
-  eq(track.name, 'Voice 3')
+  eq(track.name, 'Voice/Audio 3')
   eq(track.color, TRACK_TYPES[0].color)
   eq(track.volumeDb, 0)
   eq(track.pan, 0)
@@ -155,11 +155,11 @@ test('createTrack honours name, color and id overrides', () => {
 test('createTrack defaults the type to voice', () => {
   eq(createTrack({}).type, 'voice')
   eq(createTrack().type, 'voice')
-  eq(createTrack({ index: 0 }).name, 'Voice 1')
+  eq(createTrack({ index: 0 }).name, 'Voice/Audio 1')
 })
 
 test('createTrack rejects bad specs', () => {
-  throws(() => createTrack({ type: 'bass' }), 'unknown type')
+  throws(() => createTrack({ type: 'pad' }), 'unknown type')
   throws(() => createTrack(null), 'null spec')
   throws(() => createTrack([]), 'array spec')
   eq(createTrack({ type: 'loop', index: NaN }).index, 0)
@@ -356,8 +356,8 @@ test('addTrack appends, assigns ids and keeps indexes in step', () => {
 
 test('addTrack gives distinct default names by index', () => {
   const list = fresh()
-  eq(addTrack(list, { type: 'instrument' }).name, 'Instrument 1')
-  eq(addTrack(list, { type: 'instrument' }).name, 'Instrument 2')
+  eq(addTrack(list, { type: 'instrument' }).name, 'Virtual instruments 1')
+  eq(addTrack(list, { type: 'instrument' }).name, 'Virtual instruments 2')
 })
 
 test('removeTrack returns the track and reindexes survivors', () => {
@@ -513,7 +513,7 @@ test('summarise on an empty list is all zeros', () => {
   eq(s.audible, 0)
   eq(s.armed, 0)
   eq(Object.values(s.types).reduce((x, y) => x + y, 0), 0)
-  eq(Object.keys(s.types).length, 4)
+  eq(Object.keys(s.types).length, 7)
 })
 
 test('deepClone copies nested arrays and leaves the source intact', () => {
@@ -538,10 +538,10 @@ test('a full mixer session keeps ids and indexes coherent', () => {
   removeTrack(list, list[0].id)
   duplicateTrack(list, list[0].id)
   moveTrack(list, list[list.length - 1].id, 0)
-  eq(list.length, 4)
-  eq(new Set(list.map((t) => t.id)).size, 4)
-  eq(list.map((t) => t.index).join(','), '0,1,2,3')
-  eq(summarise(list).count, 4)
+  eq(list.length, 7)
+  eq(new Set(list.map((t) => t.id)).size, 7)
+  eq(list.map((t) => t.index).join(','), '0,1,2,3,4,5,6')
+  eq(summarise(list).count, 7)
   near(list[0].volumeDb, 0, 0, 'fresh inserts stay at unity')
 })
 

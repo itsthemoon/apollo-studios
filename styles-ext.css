@@ -60,10 +60,14 @@
 .sheet-head h2 { font-size: 15px; font-weight: 600; flex: 1; }
 .sheet .row { margin-top: 10px; }
 .types { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-.type { display: flex; align-items: center; gap: 10px; text-align: left; background: var(--pill);
+.type { position: relative; display: flex; align-items: center; gap: 10px; text-align: left; background: var(--pill);
   border: 1px solid transparent; border-radius: 10px; padding: 12px; color: var(--ink); }
 .type:hover { background: var(--pill-hi); border-color: var(--line-hi); }
+.type .ticon { flex: 0 0 34px; height: 34px; border-radius: 8px; background: rgba(0, 198, 209, 0.14);
+  border: 1px solid rgba(0, 198, 209, 0.35); }
 .type b { font-size: 13px; font-weight: 600; display: block; }
+.type .midi { position: absolute; top: 6px; right: 8px; font-style: normal; font-size: 8px;
+  letter-spacing: 0.06em; color: var(--mute); background: var(--panel); border-radius: 3px; padding: 1px 4px; }
 .type i { font-style: normal; font-size: 11px; color: var(--dim); }
 .perks { margin: 0 0 4px 18px; font-size: 12.5px; color: var(--mute); line-height: 1.9; }
 
@@ -149,3 +153,13 @@
   background: var(--panel); border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; }
 .ver b { font-size: 12px; font-weight: 500; }
 .ver span { font-size: 10.5px; color: var(--dim); }
+
+.fxpresets { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.fxpresets .blend { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--mute); }
+.fxpresets .blend input { width: 92px; }
+.fxpresets .blend output { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+.fxpresets .ai-prompt { gap: 6px; }
+#ap-presets button { position: relative; }
+#ap-presets .new { position: absolute; top: -5px; right: -4px; font-style: normal; font-size: 8px;
+  font-weight: 700; color: #06231f; background: var(--cyan); border-radius: 3px; padding: 1px 3px; }
+#ap-presets button.locked::after { content: "\2665"; margin-left: 4px; font-size: 9px; color: var(--gold); }

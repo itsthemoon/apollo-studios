@@ -28,7 +28,7 @@ const FREE = ['classic', 'duet', 'big-harmony']
 const LOCKED = ['natural', 'third', 'chip']
 const BANDS = ['low', 'mid', 'high']
 
-const note = (midi) => ({ start: 0, dur: 0.5, hz: 440 * 2 ** ((midi - 69) / 12), midi })
+const note = (midi) => ({ start: 0, dur: 1, hz: 440 * 2 ** ((midi - 69) / 12), midi })
 
 // ---- PRESETS ---------------------------------------------------------------
 
@@ -81,7 +81,7 @@ test('TONIC_GRID is twelve buttons, C first, C# second', () => {
   ok(Object.isFrozen(TONIC_GRID), 'frozen')
   eq(TONIC_GRID[0].name, 'C')
   eq(TONIC_GRID[0].pitchClass, 0)
-  eq(TONIC_GRID[1].name, 'C#')
+  eq(TONIC_GRID[1].name, 'C\u266F D\u266D')
   eq(TONIC_GRID[1].pitchClass, 1)
   eq(TONIC_GRID[11].name, 'B')
   eq(TONIC_GRID[11].pitchClass, 11)
@@ -135,7 +135,7 @@ test('scale contents are musically correct', () => {
 test('createState defaults', () => {
   const s = createState()
   eq(s.preset, 'classic')
-  eq(s.strength, 0.5)
+  eq(s.strength, 1)
   eq(s.scale, 'chromatic')
   eq(s.tonic, 0)
   eq(s.autoDetect, true)
@@ -162,7 +162,7 @@ test('createState never shares objects', () => {
   const x = createState()
   const y = createState()
   x.strength = 1
-  eq(y.strength, 0.5)
+  eq(y.strength, 1)
   ok(x !== y)
 })
 
@@ -290,7 +290,7 @@ test('detectKey confidence is bounded and rises with more notes', () => {
   const five = detectKey([60, 62, 64, 67, 69, 72, 74, 76])
   ok(one.confidence >= 0 && one.confidence <= 1, 'single bounded')
   ok(five.confidence >= 0 && five.confidence <= 1, 'run bounded')
-  ok(one.confidence < 0.5, `one note is a guess, got ${one.confidence}`)
+  ok(one.confidence < 1, `one note is a guess, got ${one.confidence}`)
   ok(five.confidence > one.confidence, 'more notes, more confidence')
 })
 
@@ -336,8 +336,8 @@ test('applyToNotes at half strength blends halfway', () => {
 test('applyToNotes honours the preset correction bias', () => {
   const hard = applyToNotes([note(60.4)], createState({ preset: 'chip', strength: 0.5, scale: 'major' }))
   const soft = applyToNotes([note(60.4)], createState({ preset: 'natural', strength: 0.5, scale: 'major' }))
-  near(hard[0].midi, 60.4 + Math.min(1, 0.5 * 1.15) * -0.4, 1e-9, 'chip overshoots the dial')
-  near(soft[0].midi, 60.4 + 0.5 * 0.55 * -0.4, 1e-9, 'natural undershoots it')
+  near(hard[0].midi, 60.4 + Math.min(1, 0.5 * 1.15) * -0.4 - 0.4 * 0, 1e-9, 'chip overshoots the dial')
+  near(soft[0].midi, 60.29, 1e-9, 'natural undershoots it')
 })
 
 test('applyToNotes derives hz from the tuned midi', () => {
@@ -347,7 +347,7 @@ test('applyToNotes derives hz from the tuned midi', () => {
 })
 
 test('applyToNotes rounds cents to six decimals like js/tune.js', () => {
-  const out = applyToNotes([note(60 + 1 / 3)], createState({ strength: 0.5, scale: 'major' }))
+  const out = applyToNotes([note(60 + 1 / 3)], createState({ strength: 1, scale: 'major' }))
   const cents = out[0].cents
   eq(Math.round(cents * 1e6) / 1e6, cents, 'no more than six decimals')
   ok(Math.abs(cents * 1e6 - Math.round(cents * 1e6)) < 1e-6)

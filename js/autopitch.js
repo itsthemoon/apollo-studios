@@ -15,7 +15,7 @@
 import { hzToMidi, midiToHz, nearestInScale } from './tune.js'
 
 const FORMANT_LIMIT = 12
-const DEFAULT_STRENGTH = 0.5
+const DEFAULT_STRENGTH = 1
 
 // Same rounding as js/tune.js `round6`: cents are kept to six decimals so
 // repeated passes over a note list are stable.
@@ -39,7 +39,7 @@ export const PRESETS = Object.freeze([
 
 // Twelve tonic buttons, C first.
 export const TONIC_GRID = Object.freeze(
-  ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map((name, pitchClass) =>
+  ['C', 'C\u266F D\u266D', 'D', 'D\u266F E\u266D', 'E', 'F', 'F\u266F G\u266D', 'G', 'G\u266F A\u266D', 'A', 'A\u266F B\u266D', 'B'].map((name, pitchClass) =>
     Object.freeze({ name, pitchClass })
   )
 )
