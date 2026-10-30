@@ -1,4 +1,4 @@
-# Module contract — voice-studio
+# Module contract — apollo-studios
 
 Every module below is **pure ESM, dependency-free, and must import and run under plain Node 22**.
 Only `js/capture.js` and `js/app.js` may touch browser globals, and only inside functions

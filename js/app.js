@@ -3,6 +3,12 @@ import * as capture from './capture.js'
 import * as pitch from './pitch.js'
 import * as tune from './tune.js'
 import * as presets from './presets.js'
+import * as harmony from './harmony.js'
+import * as voicechar from './voicechar.js'
+import * as stems from './stems.js'
+import * as beat from './beat.js'
+import * as compose from './compose.js'
+import * as automix from './automix.js'
 import { masterChain } from './master.js'
 import { encodeWav } from './wav.js'
 
@@ -19,6 +25,8 @@ const state = {
   rec: null,
   playing: [],
   ctx: null,
+  harmonies: [],
+  stems: null,
 }
 
 // ---- helpers ---------------------------------------------------------------
@@ -177,6 +185,7 @@ async function toggleRecord() {
     state.selected = null
     $('mic-state').textContent = take.length ? `captured ${take.length} samples` : 'empty take'
     status('ready')
+    resetHarmonies()
     drawWave()
     renderNotes()
     return
@@ -205,29 +214,234 @@ function stopPlayback() {
   $('btn-stop').disabled = true
 }
 
-function play() {
-  if (!state.take?.length || !state.notes.length) return
+function playNotes(notes, opts = {}) {
+  if (!state.take?.length || !notes?.length) return
+  stopPlayback()
   const ctx = new AudioContext({ sampleRate: state.sampleRate })
   state.ctx = ctx
   const buffer = ctx.createBuffer(1, state.take.length, state.sampleRate)
   buffer.copyToChannel(state.take, 0)
   const gain = ctx.createGain()
-  gain.gain.value = Math.pow(10, Number($('in-gain').value) / 20)
+  gain.gain.value = Math.pow(10, (Number($('in-gain').value) + (opts.gainDb || 0)) / 20)
   gain.connect(ctx.destination)
   const now = ctx.currentTime + 0.06
-  for (const note of state.notes) {
+  const spread = (opts.spreadMs || 0) / 1000
+  notes.forEach((note, i) => {
+    const cents = Number.isFinite(note.cents) ? note.cents : 0
+    const offset = Number.isFinite(opts.offsets?.[i]) ? opts.offsets[i] : 0
     const src = ctx.createBufferSource()
     src.buffer = buffer
-    src.playbackRate.value = Math.pow(2, (Number.isFinite(note.cents) ? note.cents : 0) / 1200)
+    src.playbackRate.value = Math.pow(2, cents / 1200 + offset / 12)
     src.connect(gain)
-    src.start(now + note.start, note.start, Math.max(0.03, note.dur))
+    src.start(now + note.start + spread * i, note.start, Math.max(0.03, note.dur))
     state.playing.push(src)
-  }
+  })
   $('btn-play').disabled = true
   $('btn-stop').disabled = false
   status('playing')
-  const last = Math.max(...state.notes.map(n => n.start + n.dur))
-  setTimeout(() => { if (state.ctx === ctx) stopPlayback() }, (last + 0.4) * 1000)
+  const last = Math.max(...notes.map(n => n.start + n.dur))
+  setTimeout(() => { if (state.ctx === ctx) stopPlayback() }, (last + spread * notes.length + 0.4) * 1000)
+}
+
+function play() { playNotes(state.notes) }
+
+function playBuffer(buf) {
+  if (!buf?.length) return
+  stopPlayback()
+  const ctx = new AudioContext({ sampleRate: state.sampleRate })
+  state.ctx = ctx
+  const buffer = ctx.createBuffer(1, buf.length, state.sampleRate)
+  buffer.copyToChannel(buf, 0)
+  const gain = ctx.createGain()
+  gain.gain.value = 0.9
+  gain.connect(ctx.destination)
+  const src = ctx.createBufferSource()
+  src.buffer = buffer
+  src.connect(gain)
+  src.start()
+  state.playing.push(src)
+  src.onended = () => { if (state.ctx === ctx) stopPlayback() }
+}
+
+// ---- harmony ---------------------------------------------------------------
+function resetHarmonies() {
+  state.harmonies = []
+  renderHarmonies()
+}
+
+function renderHarmonies() {
+  const host = $('harmony-list')
+  host.innerHTML = ''
+  state.harmonies.forEach((set, i) => {
+    const row = document.createElement('div')
+    row.className = 'note'
+    row.title = `${set.label} · ${set.spreadMs} ms spread`
+    row.innerHTML = `<span>${set.label}</span><span>${set.notes.length} notes</span><span>${set.gainDb} dB</span><button>Preview</button>`
+    row.querySelector('button').addEventListener('click', guard(() => previewHarmony(i)))
+    host.append(row)
+  })
+  $('harmony-state').textContent = state.harmonies.length ? `${state.harmonies.length} sets` : 'no sets'
+}
+
+function buildHarmonies() {
+  if (!state.notes.length) throw new Error('no notes to harmonise')
+  const name = $('in-harmony').value
+  state.harmonies = harmony.buildHarmonies(state.notes, name)
+  renderHarmonies()
+  log(`harmonies: ${name}, ${state.harmonies.length} sets, ${state.harmonies.map(s => s.label).join(', ')}`)
+}
+
+function previewHarmony(index) {
+  const set = state.harmonies[index]
+  if (!set) throw new Error('no harmony set')
+  if (!state.take?.length) throw new Error('nothing to play')
+  const offsets = set.notes.map((n, i) => n.midi - state.notes[i].midi)
+  playNotes(set.notes, { gainDb: set.gainDb, spreadMs: set.spreadMs, offsets })
+  log(`harmony preview: ${set.label} (${set.gainDb} dB, ${set.spreadMs} ms spread)`)
+}
+
+// ---- voice character -------------------------------------------------------
+function applyCharacter() {
+  if (!state.take?.length) throw new Error('nothing to process')
+  const name = $('in-character').value
+  const out = voicechar.applyCharacter(state.take, name, state.sampleRate)
+  state.take = out
+  state.notes = pitch.detectNotes(out, state.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
+  state.selected = null
+  $('voice-state').textContent = name
+  $('mic-state').textContent = `character: ${name}`
+  resetHarmonies()
+  drawWave()
+  renderNotes()
+  log(`voice: ${name}, ${out.length} samples, ${state.notes.length} notes re-detected`)
+}
+
+// ---- stems -----------------------------------------------------------------
+function rmsDb(buf) {
+  if (!buf?.length) return -Infinity
+  let sum = 0
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i]
+  const rms = Math.sqrt(sum / buf.length)
+  return rms > 0 ? 20 * Math.log10(rms) : -Infinity
+}
+
+const fmtDb = (v) => (Number.isFinite(v) ? `${v.toFixed(1)} dB` : '-inf')
+
+function split() {
+  if (!state.take?.length) throw new Error('nothing to split')
+  state.stems = stems.splitStems(state.take, state.sampleRate)
+  const leads = rmsDb(state.stems.leads)
+  const bed = rmsDb(state.stems.bed)
+  $('stem-readout').textContent = `leads ${fmtDb(leads)} · bed ${fmtDb(bed)}`
+  log(`stems: leads rms ${fmtDb(leads)}, bed rms ${fmtDb(bed)}`)
+}
+
+function recombineStems() {
+  if (!state.stems) throw new Error('no stems to recombine')
+  const out = stems.recombine(state.stems)
+  state.take = out
+  state.stems = null
+  state.notes = pitch.detectNotes(out, state.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
+  state.selected = null
+  $('stem-readout').textContent = `recombined ${out.length} samples`
+  resetHarmonies()
+  drawWave()
+  renderNotes()
+  log(`stems recombined: ${out.length} samples, ${state.notes.length} notes re-detected`)
+}
+
+// ---- beat ------------------------------------------------------------------
+function generateBeat() {
+  const genre = $('in-genre').value
+  const bars = Number($('in-bars').value)
+  const rendered = beat.renderBeat(genre, bars, state.sampleRate)
+  const base = state.take ?? new Float32Array(0)
+  const mixed = new Float32Array(Math.max(base.length, rendered.length))
+  mixed.set(base)
+  for (let i = 0; i < rendered.length; i++) {
+    mixed[i] = Math.max(-1, Math.min(1, mixed[i] + rendered[i] * 0.6))
+  }
+  state.take = mixed
+  state.notes = pitch.detectNotes(mixed, state.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
+  state.selected = null
+  resetHarmonies()
+  drawWave()
+  renderNotes()
+  log(`beat: ${genre} ${bars} bars, ${rendered.length} samples mixed, ${state.notes.length} notes`)
+}
+
+// ---- compose ---------------------------------------------------------------
+function feedNotes(notes, label) {
+  state.notes = notes.map(n => ({ ...n, origMidi: n.midi }))
+  state.selected = null
+  resetHarmonies()
+  renderNotes()
+  log(`compose: ${label}, ${notes.length} notes`)
+}
+
+function composeMelody() {
+  const seed = Number($('in-seed').value)
+  const notes = compose.generateMelody({
+    root: Number($('in-root').value),
+    scale: $('in-scale').value,
+    steps: Number($('in-steps').value),
+    bpm: Number($('in-bpm').value),
+    seed,
+    octave: 1,
+  })
+  feedNotes(notes, `melody seed ${seed}`)
+}
+
+function composeChords() {
+  const seed = Number($('in-seed').value)
+  const chords = compose.generateChords({
+    root: Number($('in-root').value),
+    scale: $('in-scale').value,
+    bars: Number($('in-bars').value),
+    bpm: Number($('in-bpm').value),
+    seed,
+  })
+  feedNotes(compose.chordNotes(chords), `chords seed ${seed}, ${chords.length} bars`)
+}
+
+// ---- automix ---------------------------------------------------------------
+function suggestMaster() {
+  const genre = $('in-genre').value
+  const s = automix.suggestFromGenre(genre)
+  state.bands = s.eq.map(b => ({ ...b }))
+  renderBands()
+  $('in-thresh').value = String(s.comp.thresholdDb)
+  $('in-ratio').value = String(s.comp.ratio)
+  $('in-target').value = String(s.targetRmsDb)
+  $('out-thresh').textContent = `${s.comp.thresholdDb} dB`
+  $('out-ratio').textContent = `${s.comp.ratio}:1`
+  $('out-target').textContent = `${s.targetRmsDb} dB`
+  $('automix-readout').textContent = `${genre}: ${state.bands.length} bands, target ${s.targetRmsDb} dB`
+  log(`automix: ${genre} -> ${state.bands.length} bands, comp ${s.comp.thresholdDb} dB / ${s.comp.ratio}:1, target ${s.targetRmsDb} dB`)
+}
+
+function balanceLevels() {
+  const levels = []
+  const labels = []
+  if (state.take?.length) { levels.push(rmsDb(state.take)); labels.push('take') }
+  if (state.stems) {
+    levels.push(rmsDb(state.stems.leads)); labels.push('leads')
+    levels.push(rmsDb(state.stems.bed)); labels.push('bed')
+  }
+  if (!levels.length) throw new Error('no levels to balance')
+  const trims = automix.balance(levels)
+  const text = labels.map((label, i) => `${label} ${trims[i] > 0 ? '+' : ''}${trims[i]} dB`).join(', ')
+  $('automix-readout').textContent = text
+  log(`balance: ${text}`)
+}
+
+function previewNote() {
+  const instrument = $('in-instrument').value
+  const note = state.selected != null ? state.notes[state.selected] : null
+  const hz = note && Number.isFinite(note.hz) && note.hz > 0 ? note.hz : tune.midiToHz(Number($('in-root').value) + 60)
+  const buf = automix.renderNote(instrument, hz, 0.8, state.sampleRate)
+  playBuffer(buf)
+  log(`instrument preview: ${instrument} at ${hz.toFixed(1)} Hz`)
 }
 
 // ---- presets ---------------------------------------------------------------
@@ -282,7 +496,7 @@ function currentPatch() {
 // ---- project ---------------------------------------------------------------
 function saveProject() {
   const project = { version: 1, bpm: Number($('in-bpm').value), notes: state.notes, patch: currentPatch(), sampleRate: state.sampleRate }
-  download(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }), 'voice-studio-project.json')
+  download(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }), 'apollo-studios-project.json')
   log('project saved')
 }
 
@@ -319,6 +533,7 @@ function loadDemo() {
   state.notes = pitch.detectNotes(take, sr).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
   $('mic-state').textContent = 'demo take'
+  resetHarmonies()
   drawWave()
   renderNotes()
   log(`demo: ${state.notes.length} notes detected`)
@@ -330,7 +545,7 @@ function exportWav() {
   const rate = Number($('in-rate').value)
   const { stereo, report } = masterChain(stereoFrom(state.take), settings(), state.sampleRate)
   const bytes = encodeWav(stereo, rate)
-  download(new Blob([bytes], { type: 'audio/wav' }), `voice-studio-${Date.now()}.wav`)
+  download(new Blob([bytes], { type: 'audio/wav' }), `apollo-studios-${Date.now()}.wav`)
   log(`exported ${bytes.length} bytes @ ${rate} Hz, peak ${report.peakDb.toFixed(2)} dB, gain ${report.gainDb.toFixed(2)} dB`)
   status('exported')
 }
@@ -339,6 +554,10 @@ function exportWav() {
 function boot() {
   $('in-root').innerHTML = NAMES.map((n, i) => `<option value="${i}">${n}</option>`).join('')
   $('in-scale').innerHTML = tune.scaleNames().map(n => `<option value="${n}">${n}</option>`).join('')
+  $('in-harmony').innerHTML = harmony.HARMONY_PRESETS.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
+  $('in-character').innerHTML = voicechar.CHARACTERS.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
+  $('in-genre').innerHTML = beat.GENRES.map(g => `<option value="${g.name}">${g.name}</option>`).join('')
+  $('in-instrument').innerHTML = automix.INSTRUMENTS.map(i => `<option value="${i.name}">${i.name}</option>`).join('')
   state.bands = [
     { kind: 'highpass', freq: 90, q: 0.71, gainDb: 0 },
     { kind: 'peaking', freq: 250, q: 1, gainDb: 0 },
@@ -349,6 +568,7 @@ function boot() {
   ]
   renderBands()
   renderPresets()
+  renderHarmonies()
   drawWave()
   renderNotes()
 
@@ -359,6 +579,16 @@ function boot() {
   $('btn-export').addEventListener('click', guard(exportWav))
   $('btn-save').addEventListener('click', guard(saveProject))
   $('btn-demo').addEventListener('click', guard(loadDemo))
+  $('btn-harmony').addEventListener('click', guard(buildHarmonies))
+  $('btn-character').addEventListener('click', guard(applyCharacter))
+  $('btn-split').addEventListener('click', guard(split))
+  $('btn-recombine').addEventListener('click', guard(recombineStems))
+  $('btn-beat').addEventListener('click', guard(generateBeat))
+  $('btn-melody').addEventListener('click', guard(composeMelody))
+  $('btn-chords').addEventListener('click', guard(composeChords))
+  $('btn-suggest').addEventListener('click', guard(suggestMaster))
+  $('btn-balance').addEventListener('click', guard(balanceLevels))
+  $('btn-preview-note').addEventListener('click', guard(previewNote))
   $('btn-export-preset').addEventListener('click', guard(() => {
     const patch = currentPatch()
     download(new Blob([presets.serializePatch(patch)], { type: 'application/json' }), `${patch.name}.json`)
@@ -394,11 +624,17 @@ function boot() {
   $('in-gain').addEventListener('input', () => { if (state.ctx) play() })
 
   window.VS = {
-    version: 1,
+    version: 2,
     get state() { return state },
     setState(next) { state.notes = next.notes ?? state.notes; renderNotes() },
     exportWav,
     loadDemo,
+    harmonySet(name) {
+      $('in-harmony').value = name
+      buildHarmonies()
+      return state.harmonies.map(s => s.label)
+    },
+    split,
   }
   status('ready')
 }

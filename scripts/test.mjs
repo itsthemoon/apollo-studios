@@ -147,12 +147,22 @@ test('dom wiring', () => {
 
 // ---- 7. serving ------------------------------------------------------------
 await testAsync('page serves', async () => {
-  for (const path of ['/', '/app.html', '/js/app.js', '/styles.css']) {
-    const res = await fetch(`http://127.0.0.1:4173${path}`)
-    eq(res.status, 200, `${path} serves`)
+  const landing = await fetch('http://127.0.0.1:4173/')
+  eq(landing.status, 200, '/ serves')
+  const html = await landing.text()
+  ok(html.includes('Undertow'), '/ is the Undertow landing page')
+  ok(html.includes('href="app.html"'), '/ links to the studio')
+
+  eq((await fetch('http://127.0.0.1:4173/app.html')).status, 200, '/app.html serves')
+  eq((await fetch('http://127.0.0.1:4173/styles-landing.css')).status, 200, 'landing stylesheet serves')
+  for (const path of ['/js/app.js', '/styles.css', '/LICENSE', '/README.md']) {
+    eq((await fetch(`http://127.0.0.1:4173${path}`)).status, 200, `${path} serves`)
   }
-  const html = await (await fetch('http://127.0.0.1:4173/app.html')).text()
-  ok(html.includes('js/app.js'), 'app page loads the app module')
+  for (const page of ['getting-started', 'features', 'architecture', 'faq']) {
+    const res = await fetch(`http://127.0.0.1:4173/docs/${page}.html`)
+    eq(res.status, 200, `/docs/${page}.html serves`)
+    ok((await res.text()).includes('Undertow'), `docs/${page}.html is branded`)
+  }
 })
 
 report()

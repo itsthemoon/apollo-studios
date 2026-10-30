@@ -1,4 +1,4 @@
-// js/voicechar.js — vocal character chain for voice-studio (character node).
+// js/voicechar.js — vocal character chain for apollo-studios (character node).
 // Pure ESM, dependency-free, no browser globals. Runs under plain Node 22 and
 // in the browser. See js/contract.md and js/contract-appendix.md.
 //

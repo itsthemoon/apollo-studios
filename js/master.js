@@ -1,4 +1,4 @@
-// master.js — voice-studio master bus: EQ -> compressor -> RMS normalise -> limiter.
+// master.js — apollo-studios master bus: EQ -> compressor -> RMS normalise -> limiter.
 // Pure ESM, dependency-free, runs under plain Node 22 and in the browser.
 // Stereo is { left: Float32Array, right: Float32Array } with equal lengths and
 // samples in [-1, 1]. No exported function mutates or aliases its inputs.

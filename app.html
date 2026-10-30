@@ -45,6 +45,61 @@
 
   <section class="panel">
     <div class="panel-head">
+      <h2>Harmony</h2>
+      <span id="harmony-state" class="hint">no sets</span>
+    </div>
+    <div class="row">
+      <label>Preset <select id="in-harmony"></select></label>
+      <button id="btn-harmony" class="ghost" type="button">Build harmonies</button>
+    </div>
+    <div id="harmony-list" class="notes"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Voice</h2>
+      <span id="voice-state" class="hint">natural</span>
+    </div>
+    <div class="row">
+      <label>Character <select id="in-character"></select></label>
+      <button id="btn-character" class="ghost" type="button">Apply</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Tools</h2>
+      <span id="tools-state" class="hint">idle</span>
+    </div>
+    <div class="row">
+      <button id="btn-split" class="ghost" type="button">Split stems</button>
+      <button id="btn-recombine" class="ghost" type="button">Recombine</button>
+      <span id="stem-readout" class="hint">no stems</span>
+    </div>
+    <div class="row">
+      <label>Genre <select id="in-genre"></select></label>
+      <label>Bars <input id="in-bars" type="number" min="1" max="8" value="2" step="1"></label>
+      <button id="btn-beat" class="ghost" type="button">Generate beat</button>
+    </div>
+    <div class="row">
+      <button id="btn-melody" class="ghost" type="button">Melody</button>
+      <button id="btn-chords" class="ghost" type="button">Chords</button>
+      <label>Steps <input id="in-steps" type="number" min="2" max="32" value="8" step="1"></label>
+      <label>Seed <input id="in-seed" type="number" min="0" max="999999" value="7" step="1"></label>
+    </div>
+    <div class="row">
+      <button id="btn-suggest" class="ghost" type="button">Suggest from genre</button>
+      <button id="btn-balance" class="ghost" type="button">Balance</button>
+      <span id="automix-readout" class="hint">automix idle</span>
+    </div>
+    <div class="row">
+      <label>Instrument <select id="in-instrument"></select></label>
+      <button id="btn-preview-note" class="ghost" type="button">Preview note</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
       <h2>Presets</h2>
       <div class="row tight">
         <label class="ghost file">Import<input id="file-preset" type="file" accept=".json,application/json" hidden></label>

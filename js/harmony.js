@@ -1,4 +1,4 @@
-// js/harmony.js — harmony stacks for voice-studio (harmony node).
+// js/harmony.js — harmony stacks for apollo-studios (harmony node).
 // Pure ESM, dependency-free, no browser globals. Runs under plain Node 22 and
 // in the browser. See js/contract.md and js/contract-appendix.md.
 //

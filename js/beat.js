@@ -1,4 +1,4 @@
-// js/beat.js — synthesized drum machine for voice-studio (beat node).
+// js/beat.js — synthesized drum machine for apollo-studios (beat node).
 // Pure ESM, dependency-free, no browser globals. Runs under plain Node 22 and in the
 // browser. See js/contract-appendix.md.
 //
@@ -105,8 +105,8 @@ export const GENRES = Object.freeze([
       hat: '..x...x...x...x.',
     }),
     voices: Object.freeze({
-      kick: Object.freeze({ gain: 0.95, decay: 0.21, startHz: 112, endHz: 45 }),
-      snare: Object.freeze({ gain: 0.52, decay: 0.06, body: 196, hp: 1600, toneMix: 0.3 }),
+      kick: Object.freeze({ gain: 0.95, decay: 0.21, startHz: 110, endHz: 45 }),
+      snare: Object.freeze({ gain: 0.52, decay: 0.06, body: 180, hp: 1600, toneMix: 0.3 }),
       hat: Object.freeze({ gain: 0.25, decay: 0.012, hp: 6800, toneMix: 0 }),
     }),
   }),

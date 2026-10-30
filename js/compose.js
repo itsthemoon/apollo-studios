@@ -1,4 +1,4 @@
-// js/compose.js — seeded melody and chord generation for voice-studio.
+// js/compose.js — seeded melody and chord generation for apollo-studios.
 // Pure ESM, dependency-free, no browser globals. Runs under plain Node 22 and in the
 // browser. See js/contract-appendix.md.
 //
@@ -73,6 +73,7 @@ export function generateMelody(opts = {}) {
     if (i > 0) {
       const dir = rnd() < 0.5 ? -1 : 1
       const mag = rnd() < 0.5 ? 1 : 2
+      const prev = index
       index += dir * mag
       const last = oct.length - 1
       if (index < 0) index = -index

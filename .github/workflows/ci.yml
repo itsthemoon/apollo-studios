@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Syntax check every module
+        run: |
+          set -euo pipefail
+          for f in js/*.js; do
+            echo "check $f"
+            node --check "$f"
+          done
+
+      - name: Syntax check the harness
+        run: |
+          set -euo pipefail
+          for f in scripts/*.mjs; do
+            node --check "$f"
+          done
+
+      - name: Start the static server
+        run: |
+          set -euo pipefail
+          node scripts/serve.mjs > /tmp/serve.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS -o /dev/null http://127.0.0.1:4173/; then
+              echo "server up after ${i} tries"
+              exit 0
+            fi
+            sleep 0.25
+          done
+          echo "server never came up"
+          cat /tmp/serve.log
+          exit 1
+
+      - name: Run the suite
+        run: node scripts/test.mjs
+
+      - name: Server log on failure
+        if: failure()
+        run: cat /tmp/serve.log || true

@@ -168,6 +168,15 @@ test('hats are short: a hit is spent inside 30 ms', () => {
   ok(tail < highBand(buf, 0, win) * 3, 'nothing of the hat survives past its tail')
 })
 
+test('house is the spec reference: 110 -> 45 Hz kick, 180 Hz snare body', () => {
+  const house = GENRES.find((g) => g.name === 'house')
+  eq(house.voices.kick.startHz, 110, 'kick starts at 110 Hz')
+  eq(house.voices.kick.endHz, 45, 'kick lands on 45 Hz')
+  eq(house.voices.snare.body, 180, 'snare body is 180 Hz')
+  ok(house.voices.snare.hp > 1000, 'snare noise is highpassed')
+  ok(house.voices.hat.hp > 5000, 'hat noise is highpassed')
+})
+
 test('unknown genre throws', () => {
   throws(() => renderBeat('polka', 1, RATE), 'unknown genre must throw')
   throws(() => renderBeat(undefined, 1, RATE), 'missing genre must throw')

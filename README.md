@@ -51,7 +51,8 @@ are in the tree. The audio maths are textbook — autocorrelation pitch tracking
 published, and the master chain is ordinary EQ, compression and limiting rather than anything
 reverse engineered.
 
-Undertow is independent and not affiliated with BandLab, Ableton or any other DAW vendor.
+Undertow is independent and not affiliated with BandLab, Ableton or any other DAW vendor. Full note:
+[docs/NOT-AFFILIATED.md](docs/NOT-AFFILIATED.md).
 
 ## Verify
 
@@ -59,7 +60,7 @@ Undertow is independent and not affiliated with BandLab, Ableton or any other DA
 node scripts/test.mjs
 ```
 
-Exit 0 only when all four module self-tests pass, the synthetic phrase becomes four correct notes,
+Exit 0 only when every module self-test passes, the synthetic phrase becomes four correct notes,
 snapping stays in key without mutating its input, presets round-trip and reject malformed files,
 the master chain stays under 0 dBFS, the WAV header is byte-exact, and the site serves. `npm test`
 runs the same thing. CI runs it on Node 22 across the whole `js/` tree with `node --check` first.

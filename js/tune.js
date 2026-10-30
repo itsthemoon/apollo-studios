@@ -1,4 +1,4 @@
-// js/tune.js — pitch correction for voice-studio (tune node).
+// js/tune.js — pitch correction for apollo-studios (tune node).
 // Pure ESM, dependency-free, no browser globals. Runs under plain Node 22
 // and in the browser. See js/contract.md for the module contract.
 //

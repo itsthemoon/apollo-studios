@@ -7,8 +7,9 @@ import { test, eq, ok, near, throws, report } from './lib/assert.mjs'
 const BPM = 120
 const SCALE = 'major'
 const ROOT = 60
-const IN_SCALE = new Set(SCALES[SCALE].map((o) => ((o % 12) + 12) % 12))
-const inScale = (midi) => IN_SCALE.has((((midi - ROOT) % 12) + 12) % 12)
+const scaleSet = (scale) => new Set(SCALES[scale].map((o) => ((o % 12) + 12) % 12))
+const IN_SCALE = scaleSet(SCALE)
+const inScale = (midi, scale = SCALE) => scaleSet(scale).has((((midi - ROOT) % 12) + 12) % 12)
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
 test('mulberry32: same seed gives the same sequence', () => {
@@ -58,7 +59,7 @@ test('melody: stays inside one octave of the base and inside the scale', () => {
       for (const n of notes) {
         ok(Number.isInteger(n.midi), 'midi must be an integer')
         ok(n.midi >= ROOT && n.midi <= ROOT + 12, `midi ${n.midi} outside the octave`)
-        ok(IN_SCALE.has((((n.midi - ROOT) % 12) + 12) % 12), `midi ${n.midi} outside ${scale}`)
+        ok(inScale(n.midi, scale), `midi ${n.midi} outside ${scale}`)
       }
     }
   }
@@ -139,7 +140,7 @@ test('chords: triads are diatonic, above the root, and stack thirds', () => {
       eq(c.midis.length, 3, 'triad has three tones')
       for (const m of c.midis) {
         ok(m >= ROOT, `chord tone ${m} below the root`)
-        ok(inScale(m), `chord tone ${m} outside ${scale}`)
+        ok(inScale(m, scale), `chord tone ${m} outside ${scale}`)
       }
     }
   }

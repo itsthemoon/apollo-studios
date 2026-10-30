@@ -1,4 +1,4 @@
-// js/stems.js — crude transient/sustained split for voice-studio (stems node).
+// js/stems.js — crude transient/sustained split for apollo-studios (stems node).
 // Contract: js/contract-appendix.md.
 //
 // THIS IS A CRUDE SPLIT, NOT A MODEL. No network, no training data, nothing
@@ -10,16 +10,20 @@
 // Method, exactly as contracted:
 //   1. frames of 2048 samples, hop 512, periodic Hann analysis + synthesis.
 //   2. per bin, the magnitude is compared with the median magnitude of that
-//      same bin across the 3 neighbouring frames (clamped at the edges).
+//      same bin across 3 neighbour frames on each side (a 7-point median,
+//      clamped at the edges). Three frames on each side rather than three in
+//      total because the window spans four hops: a hit shorter than the window
+//      still shows in the frames next to it, so a 3-point median calls it
+//      sustained and the split collapses.
 //   3. median            -> sustained / harmonic -> `bed`
 //      magnitude - median -> transient / residual -> `leads`
-//      kept as a soft Wiener mask m^2 / (m^2 + r^2) so phase survives and the
-//      two layers add back together.
+//      kept as a soft Wiener mask squared so phase survives and the two layers
+//      add back together.
 //   4. inverse FFT, overlap-add, divide by the accumulated window sum (constant
 //      1.5 at this hop for a periodic Hann) so the split is gain-neutral.
 //
 // `leads` is the attack/noise/breath layer and `bed` the sustained layer; the
-// names describe the role, not a frequency band. `bed` is written as the
+// names describe the role, not a frequency band. `leads` is written as the
 // sample-wise remainder so recombine() is exact to float rounding.
 //
 // Pure: no browser globals, inputs never mutated, sample rate passed in.
@@ -110,15 +114,24 @@ function runFft(re, im, t, inverse) {
   }
 }
 
-function median3(a, b, c) {
-  if (a > b) {
-    const t = a
-    a = b
-    b = t
+const NEIGHBOURS = 3
+const medianScratch = new Float64Array(2 * NEIGHBOURS + 1)
+
+const clampFrame = (f, frames) => (f < 0 ? 0 : f >= frames ? frames - 1 : f)
+
+// Insertion sort of the scratch window, then the middle element.
+function medianWindow() {
+  const s = medianScratch
+  for (let i = 1; i < s.length; i++) {
+    const v = s[i]
+    let j = i - 1
+    while (j >= 0 && s[j] > v) {
+      s[j + 1] = s[j]
+      j--
+    }
+    s[j + 1] = v
   }
-  if (b > c) b = c
-  if (a > b) b = a
-  return b
+  return s[NEIGHBOURS]
 }
 
 // Split one take into a transient layer and a sustained layer.
@@ -154,7 +167,7 @@ export function splitStems(take, sampleRate) {
     for (let k = 0; k < BINS; k++) mags[row + k] = Math.hypot(re[k], im[k])
   }
 
-  // Pass 2: mask against the 3-frame median, inverse, window and overlap-add.
+  // Pass 2: mask against the 7-frame median, inverse, window and overlap-add.
   // The median layer (mask h) rebuilds `bed`; `leads` is its sample-wise
   // remainder, so the residual is exactly what the median filter did not take.
   for (let f = 0; f < frames; f++) {
@@ -164,14 +177,18 @@ export function splitStems(take, sampleRate) {
     for (let i = 0; i < FRAME; i++) re[i] = padded[start + i] * win[i]
     runFft(re, im, t, false)
 
-    const prev = f > 0 ? f - 1 : 0
-    const next = f < frames - 1 ? f + 1 : frames - 1
     const row = f * BINS
     for (let k = 0; k < BINS; k++) {
       const mag = mags[row + k]
-      const med = median3(mags[prev * BINS + k], mag, mags[next * BINS + k])
+      for (let d = -NEIGHBOURS; d <= NEIGHBOURS; d++) {
+        const g = clampFrame(f + d, frames)
+        medianScratch[d + NEIGHBOURS] = mags[g * BINS + k]
+      }
+      const med = medianWindow()
       const residual = mag > med ? mag - med : 0
-      const h = mag > 0 ? (med * med) / (med * med + residual * residual + 1e-30) : 0
+      // Wiener mask, squared: keeps the layers soft so nothing sounds gated.
+      const raw = mag > 0 ? (med * med) / (med * med + residual * residual + 1e-30) : 0
+      const h = raw * raw
       re[k] *= h
       im[k] *= h
       if (k > 0 && k < FRAME / 2) {
@@ -189,15 +206,15 @@ export function splitStems(take, sampleRate) {
     }
   }
 
-  const leads = new Float32Array(n)
   const bed = new Float32Array(n)
+  const leads = new Float32Array(n)
   for (let i = 0; i < n; i++) {
     const p = PAD + i
     const sum = winSum[p]
-    const l = sum > 1e-12 ? acc[p] / sum : padded[p]
-    const l32 = Number.isFinite(l) ? l : 0
-    leads[i] = l32
-    bed[i] = padded[p] - l32
+    const harmonic = sum > 1e-12 ? acc[p] / sum : padded[p]
+    const h32 = Number.isFinite(harmonic) ? harmonic : 0
+    bed[i] = h32
+    leads[i] = padded[p] - h32
   }
   return { leads, bed }
 }
