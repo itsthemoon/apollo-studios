@@ -27,6 +27,7 @@ const state = {
   ctx: null,
   harmonies: [],
   stems: null,
+  demoDuration: null,
 }
 
 // ---- helpers ---------------------------------------------------------------
@@ -135,31 +136,51 @@ function syncTuning() {
   if ($('in-quantize').checked) {
     state.notes = tune.quantizeStarts(state.notes, { bpm: Number($('in-bpm').value), division: DIVISION })
   }
+  // how far each note was actually transposed from its take pitch: playback
+  // rate and the harmony preview read this, `cents` is only the residual
+  state.notes = state.notes.map(n => (
+    Number.isFinite(n.origMidi) && Number.isFinite(n.midi) ? { ...n, shift: n.midi - n.origMidi } : n
+  ))
 }
 
 function drawWave() {
   const canvas = $('wave')
+  const clip = document.querySelector('.clip')
+  if (clip) {
+    // a real take spans the whole arrangement; the default is one bar (--ppb)
+    clip.style.width = state.demoDuration ? '100%' : ''
+    clip.title = state.demoDuration ? `${state.demoDuration.toFixed(1)} s take` : ''
+    const w = Math.max(1, Math.round(clip.clientWidth - 20))
+    if (canvas.width !== w) canvas.width = w
+  }
   const g = canvas.getContext('2d')
   g.fillStyle = '#0e0e13'
   g.fillRect(0, 0, canvas.width, canvas.height)
   if (!state.take?.length) return
-  g.strokeStyle = '#bf5af2'
-  g.beginPath()
+  const mid = canvas.height / 2
   const step = Math.max(1, Math.floor(state.take.length / canvas.width))
+  /* RMS per column reads like a waveform; raw peaks in a dense mix are a flat block */
+  const rms = new Float32Array(canvas.width)
+  let loudest = 0
   for (let x = 0; x < canvas.width; x++) {
-    let peak = 0
-    for (let i = x * step; i < (x + 1) * step && i < state.take.length; i++) {
-      peak = Math.max(peak, Math.abs(state.take[i]))
-    }
-    const y = (1 - peak) * (canvas.height / 2)
-    x === 0 ? g.moveTo(0, canvas.height / 2 - (canvas.height / 2 - y)) : g.lineTo(x, y)
+    let sum = 0, n = 0
+    for (let i = x * step; i < (x + 1) * step && i < state.take.length; i++, n++) sum += state.take[i] * state.take[i]
+    rms[x] = n ? Math.sqrt(sum / n) : 0
+    loudest = Math.max(loudest, rms[x])
+  }
+  const scale = (mid - 2) / Math.max(0.004, loudest)
+  g.strokeStyle = '#6fa8ff'
+  g.beginPath()
+  for (let x = 0; x < canvas.width; x++) {
+    const amp = Math.min((mid - 2) * 0.86, Math.pow(rms[x] * scale / (mid - 2), 0.7) * (mid - 2))
+    g.moveTo(x + 0.5, mid - amp)
+    g.lineTo(x + 0.5, mid + amp)
   }
   g.stroke()
-  // mirror line for readability
-  g.strokeStyle = 'rgba(236,236,242,.12)'
+  g.strokeStyle = '#2c4a52'
   g.beginPath()
-  g.moveTo(0, canvas.height / 2)
-  g.lineTo(canvas.width, canvas.height / 2)
+  g.moveTo(0, mid + 0.5)
+  g.lineTo(canvas.width, mid + 0.5)
   g.stroke()
 }
 
@@ -185,6 +206,7 @@ async function toggleRecord() {
     clearInterval(state.timer)
     const take = await rec.stop()
     state.sampleRate = rec.sampleRate
+    state.demoDuration = null
     state.take = take
     state.notes = pitch.detectNotes(take, rec.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
     state.selected = null
@@ -233,10 +255,13 @@ function playNotes(notes, opts = {}) {
   const spread = (opts.spreadMs || 0) / 1000
   notes.forEach((note, i) => {
     const cents = Number.isFinite(note.cents) ? note.cents : 0
+    // `shift` is the real transposition applied by tuning; fall back to the
+    // residual cents for notes that never carried a take pitch
+    const pitch = Number.isFinite(note.shift) ? note.shift : cents / 100
     const offset = Number.isFinite(opts.offsets?.[i]) ? opts.offsets[i] : 0
     const src = ctx.createBufferSource()
     src.buffer = buffer
-    src.playbackRate.value = Math.pow(2, cents / 1200 + offset / 12)
+    src.playbackRate.value = Math.pow(2, pitch / 12 + offset / 12)
     src.connect(gain)
     src.start(now + note.start + spread * i, note.start, Math.max(0.03, note.dur))
     state.playing.push(src)
@@ -319,6 +344,29 @@ function applyCharacter() {
   drawWave()
   renderNotes()
   log(`voice: ${name}, ${out.length} samples, ${state.notes.length} notes re-detected`)
+}
+
+// ---- autotune --------------------------------------------------------------
+// Same engine the snap slider uses: snapStrength from each note's original
+// pitch, so repeated clicks cannot compound and the strength is the slider.
+function autotune() {
+  if (!state.notes.length) throw new Error('no notes to autotune')
+  const root = Number($('in-root').value)
+  const scale = $('in-scale').value
+  const strength = Number($('in-autotune').value)
+  const amount = Math.min(1, Math.max(0, strength / 100))
+  $('in-snap').value = String(strength)
+  $('out-snap').textContent = `${strength}%`
+  const before = state.notes.map(n => (Number.isFinite(n.origMidi) ? n.origMidi : n.midi))
+  state.notes = tune.snapStrength(
+    state.notes.map((n, i) => ({ ...n, midi: before[i] })),
+    { root, scale, amount },
+  )
+  const corrected = state.notes.filter((n, i) => Math.abs(n.midi - before[i]) > 1e-6).length
+  state.selected = null
+  resetHarmonies()
+  renderNotes()
+  log(`autotune: ${corrected} notes corrected to ${NAMES[root]} ${scale} at ${strength}%`)
 }
 
 // ---- stems -----------------------------------------------------------------
@@ -517,27 +565,50 @@ async function openProject(file) {
 }
 
 // ---- demo ------------------------------------------------------------------
-function loadDemo() {
-  const sr = 48000
-  const total = Math.round(sr * 2.4)
-  const take = new Float32Array(total)
-  const phrase = [[0.1, 0.45, 58], [0.65, 0.45, 62], [1.2, 0.5, 65], [1.8, 0.5, 62]]
-  for (const [start, dur, midi] of phrase) {
-    const hz = tune.midiToHz(midi + 0.35) // deliberately flat so snap has work to do
-    const from = Math.round(start * sr)
-    const to = Math.round((start + dur) * sr)
-    for (let i = from; i < to; i++) {
-      const t = (i - from) / sr
-      const env = Math.min(1, t / 0.04) * Math.min(1, (to - i) / (sr * 0.08))
-      const body = Math.sin(2 * Math.PI * hz * t) + 0.35 * Math.sin(4 * Math.PI * hz * t)
-      take[i] = 0.42 * env * body + 0.012 * (Math.random() - 0.5)
-    }
+const DEMO_FILE = 'assets/skin.wav'
+const DEMO_ROWS = 120
+const DEMO_FRAME = 4096
+
+// A 106 s take is ~46x the old 2.4 s phrase, so detection runs on a decimated
+// copy: 12 kHz keeps every sung fundamental but cuts the autocorrelation work
+// by ~4x, and the extra frames cost nothing. Rows are capped so the DOM stays
+// scrollable on a full song.
+async function detectTakeNotes(take, rate) {
+  const factor = Math.max(1, Math.round(rate / 12000))
+  const len = Math.floor(take.length / factor)
+  const small = new Float32Array(len)
+  for (let i = 0; i < len; i++) {
+    let sum = 0
+    for (let j = 0; j < factor; j++) sum += take[i * factor + j]
+    small[i] = sum / factor
   }
-  state.sampleRate = sr
+  const notes = pitch.detectNotes(small, rate / factor, { frame: DEMO_FRAME, hop: DEMO_FRAME, minDur: 0.12 })
+  return notes.slice(0, DEMO_ROWS)
+}
+
+async function loadDemo() {
+  const res = await fetch(DEMO_FILE)
+  if (!res.ok) throw new Error(`demo: ${DEMO_FILE} -> HTTP ${res.status}`)
+  const bytes = await res.arrayBuffer()
+  // A throwaway context decodes the file; state.ctx belongs to playback.
+  const scratch = new AudioContext()
+  let buffer
+  try {
+    buffer = await scratch.decodeAudioData(bytes)
+  } catch {
+    throw new Error(`demo: ${DEMO_FILE} did not decode`)
+  } finally {
+    scratch.close()
+  }
+  const take = Float32Array.from(buffer.getChannelData(0))
+  if (!take.length) throw new Error(`demo: ${DEMO_FILE} is empty`)
+
+  state.sampleRate = buffer.sampleRate
+  state.demoDuration = take.length / buffer.sampleRate
   state.take = take
-  state.notes = pitch.detectNotes(take, sr).map(n => ({ ...n, origMidi: n.midi }))
+  state.notes = (await detectTakeNotes(take, buffer.sampleRate)).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
-  $('mic-state').textContent = 'demo take'
+  $('mic-state').textContent = 'skin'
   resetHarmonies()
   drawWave()
   renderNotes()
@@ -586,6 +657,7 @@ function boot() {
   $('btn-demo').addEventListener('click', guard(loadDemo))
   $('btn-harmony').addEventListener('click', guard(buildHarmonies))
   $('btn-character').addEventListener('click', guard(applyCharacter))
+  $('btn-autotune').addEventListener('click', guard(autotune))
   $('btn-split').addEventListener('click', guard(split))
   $('btn-recombine').addEventListener('click', guard(recombineStems))
   $('btn-beat').addEventListener('click', guard(generateBeat))
@@ -614,13 +686,15 @@ function boot() {
     e.target.value = ''  }))
 
   /* toolbar / rail / tab chrome: a drawer button shows its panel; any Export button exports */
+  const TAB_FOR = { tools: 'harmony', presets: 'harmony' }
   const openPanel = (name, focusPanel) => {
     const panel = document.getElementById('p-' + name)
     if (!panel) return
+    const tabName = TAB_FOR[name] || name
     document.querySelectorAll('.panel').forEach((p) => { p.hidden = p !== panel })
     document.body.classList.add('panel-open')
     document.querySelectorAll('.tab').forEach((t) => {
-      const on = t.dataset.drawer === name
+      const on = t.dataset.drawer === tabName
       t.classList.toggle('on', on)
       t.setAttribute('aria-selected', on ? 'true' : 'false')
       t.tabIndex = on ? 0 : -1
@@ -662,6 +736,9 @@ function boot() {
     $('out-snap').textContent = `${$('in-snap').value}%`
     renderNotes()
   })
+  $('in-autotune').addEventListener('input', () => {
+    $('out-autotune').textContent = `${$('in-autotune').value}%`
+  })
   for (const [id, unit] of [['thresh', 'dB'], ['ratio', ':1'], ['ceiling', ' dB'], ['target', ' dB'], ['gain', ' dB']]) {
     $('in-' + id).addEventListener('input', () => { $('out-' + id).textContent = `${$('in-' + id).value}${unit}` })
   }
@@ -673,6 +750,7 @@ function boot() {
     setState(next) { state.notes = next.notes ?? state.notes; renderNotes() },
     exportWav,
     loadDemo,
+    autotune,
     harmonySet(name) {
       $('in-harmony').value = name
       buildHarmonies()

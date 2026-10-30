@@ -255,7 +255,7 @@ emit(probe("return JSON.stringify({url:location.href,"
 
     step(2, 'Load demo renders a note take', `
 emit(click("#btn-demo"))
-time.sleep(0.9)
+time.sleep(1.6)  # real take: fetch + decode + pitch detect
 emit(probe("return JSON.stringify({rows:document.querySelectorAll('#note-list .note').length,"
            " count:(document.getElementById('note-count')||{}).textContent||'',"
            " log:(document.getElementById('log')||{}).textContent||'',"
@@ -300,7 +300,7 @@ emit({"base": base, "a": a, "b": b})
     const patches = Array.isArray(builtin) ? builtin : builtin.patches
 
     step(4, 'preset click updates preset state and band count', `
-emit(click(".tabs [data-drawer=presets]"))
+emit(click("[data-drawer=presets]"))
 time.sleep(0.25)
 before = probe("return JSON.stringify({bands:document.querySelectorAll('#eq-bands .band').length})")
 emit(click("#preset-list button[data-name='Hard Tune']"))
@@ -406,11 +406,11 @@ emit({"before": before, "after": after})
       }
       if (hasStems) {
         step('8b', 'split stems yields a readout', `
-emit(click(".tabs [data-drawer=tools]"))
+emit(click("[data-drawer=tools]"))
 time.sleep(0.25)
 emit(text("#stem-readout"))
 emit(click("#btn-split"))
-time.sleep(1.0)
+time.sleep(2.4)  # splitting a 106 s take, not a 2.4 s phrase
 emit(probe("return JSON.stringify({readout:(document.getElementById('stem-readout')||{}).textContent||'',"
            " log:(document.getElementById('log')||{}).textContent||''})"))
 `, d => /leads .* bed /.test(d.readout) && /stems: leads rms/.test(d.log)
