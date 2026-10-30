@@ -111,9 +111,10 @@ function renderNotes() {
   state.notes.forEach((note, i) => {
     const row = document.createElement('div')
     row.className = 'note' + (i === state.selected ? ' sel' : '')
+    row.setAttribute('role', 'listitem')
     const start = note.start.toFixed(2)
     const cents = Number.isFinite(note.cents) ? `${note.cents > 0 ? '+' : ''}${note.cents.toFixed(0)}c` : '0c'
-    row.innerHTML = `<span>${start}s</span><span>${noteName(note.midi)}</span><span>${cents}</span><button>Del</button>`
+    row.innerHTML = `<span>${start}s</span><span>${noteName(note.midi)}</span><span>${cents}</span><button aria-label="Delete the note at ${start}s, ${noteName(note.midi)}">Del</button>`
     row.addEventListener('click', (e) => {
       if (e.target.tagName === 'BUTTON') { state.notes.splice(i, 1); state.selected = null }
       else state.selected = i
@@ -280,7 +281,7 @@ function renderHarmonies() {
     const row = document.createElement('div')
     row.className = 'note'
     row.title = `${set.label} · ${set.spreadMs} ms spread`
-    row.innerHTML = `<span>${set.label}</span><span>${set.notes.length} notes</span><span>${set.gainDb} dB</span><button>Preview</button>`
+    row.innerHTML = `<span>${set.label}</span><span>${set.notes.length} notes</span><span>${set.gainDb} dB</span><button aria-label="Preview ${set.label}, ${set.notes.length} notes">Preview</button>`
     row.querySelector('button').addEventListener('click', guard(() => previewHarmony(i)))
     host.append(row)
   })
@@ -563,12 +564,12 @@ function boot() {
   $('in-genre').innerHTML = beat.GENRES.map(g => `<option value="${g.name}">${g.name}</option>`).join('')
   $('in-instrument').innerHTML = automix.INSTRUMENTS.map(i => `<option value="${i.name}">${i.name}</option>`).join('')
   state.bands = [
-    { kind: 'highpass', freq: 90, q: 0.71, gainDb: 0 },
+    { kind: 'highpass', freq: 30, q: 0.71, gainDb: 0 },
+    { kind: 'lowshelf', freq: 90, q: 0.71, gainDb: 0 },
     { kind: 'peaking', freq: 250, q: 1, gainDb: 0 },
     { kind: 'peaking', freq: 1000, q: 1, gainDb: 0 },
     { kind: 'peaking', freq: 3500, q: 1.2, gainDb: 0 },
     { kind: 'highshelf', freq: 8000, q: 0.71, gainDb: 0 },
-    { kind: 'lowshelf', freq: 12000, q: 0.71, gainDb: 0 },
   ]
   renderBands()
   renderPresets()
@@ -612,15 +613,41 @@ function boot() {
     if (file) await openProject(file)
     e.target.value = ''  }))
 
-  /* toolbar / rail / tab chrome: a drawer button scrolls its panel in; any Export button exports */
-  const openPanel = (name) => {
+  /* toolbar / rail / tab chrome: a drawer button shows its panel; any Export button exports */
+  const openPanel = (name, focusPanel) => {
     const panel = document.getElementById('p-' + name)
-    if (panel) panel.scrollIntoView({ block: 'start' })
+    if (!panel) return
+    document.querySelectorAll('.panel').forEach((p) => { p.hidden = p !== panel })
     document.body.classList.add('panel-open')
-    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.drawer === name))
+    document.querySelectorAll('.tab').forEach((t) => {
+      const on = t.dataset.drawer === name
+      t.classList.toggle('on', on)
+      t.setAttribute('aria-selected', on ? 'true' : 'false')
+      t.tabIndex = on ? 0 : -1
+    })
+    if (focusPanel) panel.focus()
   }
   document.querySelectorAll('[data-drawer]').forEach((el) => {
     el.addEventListener('click', () => openPanel(el.dataset.drawer))
+  })
+  /* real tab behaviour: arrows move, Home/End jump */
+  const tablist = document.querySelector('.tabs')
+  tablist?.addEventListener('keydown', (e) => {
+    const tabs = [...tablist.querySelectorAll('.tab')]
+    const i = tabs.indexOf(document.activeElement)
+    if (i < 0) return
+    const go = { ArrowRight: i + 1, ArrowLeft: i - 1, Home: 0, End: tabs.length - 1 }[e.key]
+    if (go === undefined) return
+    e.preventDefault()
+    const next = tabs[(go + tabs.length) % tabs.length]
+    next.focus()
+    openPanel(next.dataset.drawer)
+  })
+  /* the two file pickers live in labels, so give them a keyboard path */
+  document.querySelectorAll('label.file[role=button]').forEach((label) => {
+    label.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); label.querySelector('input').click() }
+    })
   })
   document.querySelectorAll('[data-export]').forEach((el) => {
     el.addEventListener('click', guard(exportWav))

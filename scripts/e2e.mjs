@@ -300,6 +300,8 @@ emit({"base": base, "a": a, "b": b})
     const patches = Array.isArray(builtin) ? builtin : builtin.patches
 
     step(4, 'preset click updates preset state and band count', `
+emit(click(".tabs [data-drawer=presets]"))
+time.sleep(0.25)
 before = probe("return JSON.stringify({bands:document.querySelectorAll('#eq-bands .band').length})")
 emit(click("#preset-list button[data-name='Hard Tune']"))
 time.sleep(0.5)
@@ -327,6 +329,8 @@ emit({"before": before, "after": after})
     })
 
     step(5, 'Analyze fills the peak meter with a dB value', `
+emit(click(".tabs [data-drawer=master]"))
+time.sleep(0.25)
 emit(click("#btn-analyze"))
 time.sleep(0.5)
 emit(probe("return JSON.stringify({peak:(document.getElementById('meter-peak')||{}).textContent||'',"
@@ -377,6 +381,8 @@ emit({"before": before, "after": text("#log")})
     } else {
       if (hasHarmony) {
         step('8a', 'build a harmony adds sets and rows', `
+emit(click(".tabs [data-drawer=harmony]"))
+time.sleep(0.25)
 emit(setval("#in-harmony", "thirds", "change"))
 before = probe("return JSON.stringify({rows:document.querySelectorAll('#harmony-list .note').length,"
                " state:(document.getElementById('harmony-state')||{}).textContent||''})")
@@ -400,6 +406,8 @@ emit({"before": before, "after": after})
       }
       if (hasStems) {
         step('8b', 'split stems yields a readout', `
+emit(click(".tabs [data-drawer=tools]"))
+time.sleep(0.25)
 emit(text("#stem-readout"))
 emit(click("#btn-split"))
 time.sleep(1.0)

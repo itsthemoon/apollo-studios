@@ -74,8 +74,10 @@ line does. No emoji in the source or the docs.
 ## Site changes
 
 `index.html` and `styles-landing.css` are the public face; `app.html` is the studio. Keep the
-palette: `#0b0b0f` canvas, `#ececf2` text, `#8b8b9a` muted, `#bf5af2` accent used sparingly,
-`#26262f` hairlines, system font stack. Focus rings must stay visible on every interactive element.
+palette in both, but not the same one. The landing stays `#0b0b0f` canvas, `#ececf2` text,
+`#8b8b9a` muted, `#bf5af2` accent used sparingly, `#26262f` hairlines. The studio is `#0a0a0b` canvas,
+`#ececf0` text, `#a8a8ab` muted, `#3e7bfa` accent, `#e0362c` record, teal `#0e1517` lane. System font
+stack throughout. Focus rings must stay visible on every interactive element.
 Copy is plain and specific — no exclamation marks, no superlatives that the code cannot back up.
 
 ## Scope of the licence

@@ -123,9 +123,9 @@ What was observed, and what `app.html` + `styles.css` now mirror:
 | Left rail: "+ Add Track", then a track header (mic icon, M, S, + Fx, volume), then an AutoMix row with a blue AI badge and a gold crown | Same rail, same header controls, AutoMix + Harmony rows with AI badges, statuses under each |
 | Ruler of numbered bars with bar 1 tinted dark red, snap magnet and zoom at the right | Same ruler, tinted bar 1, snap slider and zoom at the lane's top right |
 | Arrange canvas with a teal-tinted lane, a clip sized to time, faint bar grid | Lane with the same tint and grid, clip sized to one bar, waveform in the clip |
-| Bottom inspector: tab strip (AutoPitch / Fx / Editor) plus content panes | Tab strip (Take / Harmony / Voice / AutoMix & Tools / Presets / Mastering / Export) that opens the drawer |
+| Bottom inspector: tab strip (AutoPitch / Fx / Editor) plus content panes | Tab strip (Take / Harmony / Voice / AutoMix & Tools / Presets / Mastering / Export); one panel at a time, arrow keys move |
 | Status bar with Lyrics/Notes, Sounds, Shortcuts at the right | Same bar, our status on the left |
-| Palette: near-black canvas, `#141416` panels, `#1e1e21` pills, red `#f2493b` record, gold `#e8a92a` upsell, blue `#3e7bfa` AI/snap, teal lane | Same values as CSS tokens |
+| Palette: near-black canvas, `#141416` panels, `#1e1e21` pills, red `#e0362c` record (`#f2493b` when armed), gold `#e8a92a` upsell, blue `#3e7bfa` AI, `#6fa8ff` snap, teal lane | Same values as CSS tokens |
 
 Deliberately **not** copied: their icons (we use text glyphs), their fonts (system stack), the
 Discover/New Track modal, the paywall, collaboration, and their track type list. Their shapes

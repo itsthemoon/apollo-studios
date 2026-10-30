@@ -11,11 +11,11 @@
 <header class="topbar">
   <div class="tb-row tb-row-1">
     <button class="ic" type="button" aria-label="Menu">&#9776;</button>
-    <span class="wordmark"><span class="flame" aria-hidden="true"></span>Apollo&nbsp;Studios</span>
+    <h1 class="wordmark"><span class="flame" aria-hidden="true"></span>Apollo&nbsp;Studios</h1>
     <button class="getpill" type="button"><span>Get</span><span class="crown" aria-hidden="true">&#9825;</span></button>
     <span class="proj" id="proj-name">demo session</span>
     <span class="saved"><span>Last Saved</span><b id="saved-at">never</b></span>
-    <button class="pill" type="button" id="btn-open-wrap"><label class="file" style="color:inherit">Open<input id="file-project" type="file" accept=".json,application/json" hidden></label></button>
+    <span class="pill" id="btn-open-wrap"><label class="file" role="button" tabindex="0" style="color:inherit">Open<input id="file-project" type="file" accept=".json,application/json" hidden aria-label="Open a project file"></label></span>
     <button id="btn-save" class="pill" type="button">Save</button>
     <button id="btn-export" class="pill publish" type="button">Export WAV</button>
   </div>
@@ -37,7 +37,7 @@
       <button id="btn-stop" class="ic" type="button" disabled aria-label="Stop">&#9632;</button>
       <button id="btn-play" class="ic play" type="button" disabled aria-label="Play">&#9654;</button>
       <button id="btn-record" class="rec" type="button" aria-label="Record"><span class="rec-dot"></span></button>
-      <label class="loop" title="Quantize to the grid"><input id="in-quantize" type="checkbox"><span>&#8635;</span></label>
+      <label class="loop" title="Quantize to the grid"><input id="in-quantize" type="checkbox" aria-label="Quantize to the grid"><span aria-hidden="true">&#8635;</span></label>
       <span id="rec-timer" class="clock">00:00.0</span>
     </div>
 
@@ -54,7 +54,7 @@
 </header>
 
 <main class="body">
-  <aside class="rail">
+  <aside class="rail" aria-label="Tracks">
     <div class="rail-head">
       <button class="addtrack" type="button"><span aria-hidden="true">+</span> Add Track</button>
       <button class="ic" type="button" aria-label="Automation">&#8767;</button>
@@ -68,9 +68,9 @@
         <button class="ic mini" type="button" aria-label="More">&#8942;</button>
       </div>
       <div class="th-row">
-        <button class="ms" type="button">M</button>
-        <button class="ms" type="button">S</button>
-        <button class="fx" type="button">+ Fx</button>
+        <button class="ms" type="button" aria-label="Mute the voice track">M</button>
+        <button class="ms" type="button" aria-label="Solo the voice track">S</button>
+        <button class="fx" type="button" aria-label="Add a plug-in">+ Fx</button>
         <span class="th-spacer"></span>
         <span class="th-vol" aria-hidden="true"></span>
       </div>
@@ -104,7 +104,7 @@
     </button>
   </aside>
 
-  <section class="arrange">
+  <section class="arrange" aria-label="Arrangement">
     <div class="ruler-row">
       <div class="ruler" aria-hidden="true">
         <span class="bar on">1</span><span class="bar">2</span><span class="bar">3</span><span class="bar">4</span>
@@ -118,7 +118,7 @@
       <div class="lane-grid" aria-hidden="true"></div>
       <div class="ruler-tools">
         <label class="snap" title="Snap strength"><span aria-hidden="true">&#8644;</span>
-          <input id="in-snap" type="range" min="0" max="100" value="100"><output id="out-snap">100%</output>
+          <input id="in-snap" type="range" min="0" max="100" value="100" aria-label="Snap strength"><output id="out-snap">100%</output>
         </label>
         <button class="ic" type="button" aria-label="Zoom out">&#8722;</button>
         <button class="ic" type="button" aria-label="Zoom in">+</button>
@@ -131,41 +131,41 @@
     </div>
 
     <div class="scale-strip">
-      <label class="key">Scale <select id="in-scale"></select></label>
+      <label class="key">Scale <select id="in-scale" aria-label="Scale"></select></label>
       <span class="hint">notes follow the key and snap; the take is always editable</span>
     </div>
   </section>
 </main>
 
 <footer class="inspector">
-  <div class="tabs">
-    <button class="tab on" type="button" data-drawer="take">Take</button>
-    <button class="tab" type="button" data-drawer="harmony">Harmony</button>
-    <button class="tab" type="button" data-drawer="voice">Voice</button>
-    <button class="tab" type="button" data-drawer="tools">AutoMix &amp; Tools</button>
-    <button class="tab" type="button" data-drawer="presets">Presets</button>
-    <button class="tab" type="button" data-drawer="master">Mastering</button>
-    <button class="tab" type="button" data-drawer="export">Export</button>
+  <div class="tabs" role="tablist" aria-label="Studio panels">
+    <button class="tab on" role="tab" id="tab-take" aria-controls="p-take" aria-selected="true" tabindex="0" type="button" data-drawer="take">Take</button>
+    <button class="tab" role="tab" id="tab-harmony" aria-controls="p-harmony" aria-selected="false" tabindex="-1" type="button" data-drawer="harmony">Harmony</button>
+    <button class="tab" role="tab" id="tab-voice" aria-controls="p-voice" aria-selected="false" tabindex="-1" type="button" data-drawer="voice">Voice</button>
+    <button class="tab" role="tab" id="tab-tools" aria-controls="p-tools" aria-selected="false" tabindex="-1" type="button" data-drawer="tools">AutoMix &amp; Tools</button>
+    <button class="tab" role="tab" id="tab-presets" aria-controls="p-presets" aria-selected="false" tabindex="-1" type="button" data-drawer="presets">Presets</button>
+    <button class="tab" role="tab" id="tab-master" aria-controls="p-master" aria-selected="false" tabindex="-1" type="button" data-drawer="master">Mastering</button>
+    <button class="tab" role="tab" id="tab-export" aria-controls="p-export" aria-selected="false" tabindex="-1" type="button" data-drawer="export">Export</button>
   </div>
 
   <div class="ins-body" id="ins-body">
-    <section class="panel" id="p-take">
+    <section class="panel" id="p-take" role="tabpanel" aria-labelledby="tab-take">
       <div class="panel-head"><h2>Take</h2><span id="note-count" class="hint">no notes</span></div>
-      <div id="note-list" class="notes"></div>
+      <div id="note-list" class="notes" role="list" aria-label="Detected notes"></div>
       <p class="hint">Each row can be deleted. The snap slider at the top of the lane sets how hard the take is pulled to the key.</p>
     </section>
 
-    <section class="panel" id="p-harmony">
+    <section class="panel" id="p-harmony" role="tabpanel" aria-labelledby="tab-harmony" hidden>
       <div class="panel-head"><h2>Harmony <em class="ai">AI</em></h2></div>
       <div class="row">
         <label>Preset <select id="in-harmony"></select></label>
         <button id="btn-harmony" class="pill" type="button">Build harmonies</button>
         <span class="hint">one row per interval, preview through the sampler</span>
       </div>
-      <div id="harmony-list" class="notes"></div>
+      <div id="harmony-list" class="notes" role="list" aria-label="Harmony rows"></div>
     </section>
 
-    <section class="panel" id="p-voice">
+    <section class="panel" id="p-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
       <div class="panel-head"><h2>Voice character</h2></div>
       <div class="row">
         <label>Character <select id="in-character"></select></label>
@@ -174,7 +174,7 @@
       </div>
     </section>
 
-    <section class="panel" id="p-tools">
+    <section class="panel" id="p-tools" role="tabpanel" aria-labelledby="tab-tools" hidden>
       <div class="panel-head"><h2>AutoMix &amp; Tools <em class="ai">AI</em></h2></div>
       <div class="row">
         <button id="btn-split" class="pill" type="button">Split stems</button>
@@ -183,14 +183,14 @@
       </div>
       <div class="row">
         <label>Genre <select id="in-genre"></select></label>
-        <label>Bars <input id="in-bars" type="number" min="1" max="8" value="2" step="1"></label>
+        <label>Bars <input id="in-bars" type="number" min="1" max="8" value="2" step="1" aria-label="Bars"></label>
         <button id="btn-beat" class="pill" type="button">Generate beat</button>
       </div>
       <div class="row">
         <button id="btn-melody" class="pill" type="button">Melody</button>
         <button id="btn-chords" class="pill" type="button">Chords</button>
-        <label>Steps <input id="in-steps" type="number" min="2" max="32" value="8" step="1"></label>
-        <label>Seed <input id="in-seed" type="number" min="0" max="999999" value="7" step="1"></label>
+        <label>Steps <input id="in-steps" type="number" min="2" max="32" value="8" step="1" aria-label="Steps"></label>
+        <label>Seed <input id="in-seed" type="number" min="0" max="999999" value="7" step="1" aria-label="Seed"></label>
       </div>
       <div class="row">
         <button id="btn-suggest" class="pill" type="button">Suggest from genre</button>
@@ -203,26 +203,26 @@
       </div>
     </section>
 
-    <section class="panel" id="p-presets">
+    <section class="panel" id="p-presets" role="tabpanel" aria-labelledby="tab-presets" hidden>
       <div class="panel-head">
         <h2>Presets</h2>
         <div class="row tight">
-          <label class="file ghost">Import<input id="file-preset" type="file" accept=".json,application/json" hidden></label>
+          <label class="file ghost" role="button" tabindex="0">Import<input id="file-preset" type="file" accept=".json,application/json" hidden aria-label="Import a preset file"></label>
           <button id="btn-export-preset" class="pill" type="button">Export patch</button>
         </div>
       </div>
-      <div id="preset-list" class="presets"></div>
+      <div id="preset-list" class="presets" role="group" aria-label="Presets"></div>
       <p id="preset-state" class="hint">factory patches</p>
     </section>
 
-    <section class="panel" id="p-master">
+    <section class="panel" id="p-master" role="tabpanel" aria-labelledby="tab-master" hidden>
       <div class="panel-head"><h2>Mastering</h2><button id="btn-analyze" class="pill" type="button">Analyze</button></div>
-      <div id="eq-bands" class="eq"></div>
+      <div id="eq-bands" class="eq" role="group" aria-label="EQ bands"></div>
       <div class="row">
-        <label>Threshold <input id="in-thresh" type="range" min="-60" max="0" value="-18"><output id="out-thresh">-18 dB</output></label>
-        <label>Ratio <input id="in-ratio" type="range" min="1" max="12" value="3" step="0.5"><output id="out-ratio">3:1</output></label>
-        <label>Ceiling <input id="in-ceiling" type="range" min="-6" max="0" value="-1" step="0.1"><output id="out-ceiling">-1 dB</output></label>
-        <label>Target <input id="in-target" type="range" min="-24" max="-8" value="-14"><output id="out-target">-14 dB</output></label>
+        <label>Threshold <input id="in-thresh" aria-label="Threshold" type="range" min="-60" max="0" value="-18"><output id="out-thresh">-18 dB</output></label>
+        <label>Ratio <input id="in-ratio" aria-label="Ratio" type="range" min="1" max="12" value="3" step="0.5"><output id="out-ratio">3:1</output></label>
+        <label>Ceiling <input id="in-ceiling" aria-label="Ceiling" type="range" min="-6" max="0" value="-1" step="0.1"><output id="out-ceiling">-1 dB</output></label>
+        <label>Target <input id="in-target" aria-label="Loudness target" type="range" min="-24" max="-8" value="-14"><output id="out-target">-14 dB</output></label>
       </div>
       <dl id="meter" class="meter">
         <dt>peak</dt><dd id="meter-peak">--</dd>
@@ -231,7 +231,7 @@
       </dl>
     </section>
 
-    <section class="panel" id="p-export">
+    <section class="panel" id="p-export" role="tabpanel" aria-labelledby="tab-export" hidden>
       <div class="panel-head"><h2>Export</h2></div>
       <div class="row">
         <label>Rate <select id="in-rate">
