@@ -130,6 +130,7 @@ function renderBands() {
 }
 
 function renderNotes() {
+  state.studio?.drawRoll?.()
   const host = $('note-list')
   host.innerHTML = ''
   state.notes.forEach((note, i) => {

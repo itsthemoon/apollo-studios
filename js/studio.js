@@ -41,6 +41,23 @@ export function attach(app) {
   state.fxTarget = null
   state.clipGainDb = 0
 
+  /* the first track's markup is static, so its data-* hooks carry the placeholder
+     index 1 until the model hands out a real id — rebind them here */
+  const staticId = state.tracks[0].id
+  const rebind = (root) => {
+    root.querySelectorAll('[data-track],[data-fx],[data-mute],[data-solo],[data-arm],[data-vol],[data-pan],[data-fx-count],[data-vol-read],[data-automation],[data-track-menu],[data-auto-param],[data-clip],[data-clip-gain],[data-row]').forEach((el) => {
+      for (const key of ['track','fx','mute','solo','arm','vol','pan','fxCount','volRead','automation','trackMenu','clip','clipGain','row']) {
+        const attr = 'data-' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
+        if (el.getAttribute(attr) === '1' || el.getAttribute(attr) === '1:pan') {
+          el.setAttribute(attr, el.getAttribute(attr) === '1:pan' ? `${staticId}:pan` : staticId)
+        }
+      }
+    })
+  }
+  rebind($('track-1'))
+  rebind($('clip-1'))
+  rebind(document.querySelector('[data-row="1"]'))
+
   const ADJECTIVES = ['midnight', 'paper', 'neon', 'velvet', 'static', 'amber', 'glass', 'ember']
 
   // ---------------------------------------------------------------- menus and modals
@@ -373,11 +390,23 @@ export function attach(app) {
     const rows = opts.rows || ROWS
     g.clearRect(0, 0, W, H)
     if (!r) {
+      // a voice track has no roll: show its detected pitch segments, read-only
       $('note-count').textContent = state.notes.length ? `${state.notes.length} take notes` : 'no notes'
       g.fillStyle = '#0a0e10'
       g.fillRect(0, 0, W, H)
       g.fillStyle = '#192124'
       for (let b = 0; b <= 32; b += 4) g.fillRect(b * (W / 32), 0, 1, H)
+      const beatsPerSecond = Number($('in-bpm').value) / 60
+      const low = 48
+      state.notes.forEach((n) => {
+        const row = 23 - (Math.round(n.midi) - low)
+        if (row < 0 || row > 23) return
+        const x = (n.start * beatsPerSecond / 32) * W
+        const w = Math.max(3, (n.dur * beatsPerSecond / 32) * W)
+        const flat = Math.abs(n.cents || 0) < 8
+        g.fillStyle = flat ? '#3f8f99' : '#6fa8ff'
+        g.fillRect(x, row * (H / 24) + 2, w, Math.max(2, H / 24 - 4))
+      })
       return
     }
     const rowH = H / rows
@@ -981,7 +1010,14 @@ export function attach(app) {
   renderShortcuts(shortcuts.GROUPS[0])
 
   // ---------------------------------------------------------------- export options
-  $('btn-export-confirm').addEventListener('click', () => { app.exportWav(); closeModal($('m-export')) })
+  $('btn-export-confirm')?.addEventListener('click', () => { app.exportWav(); closeModal($('m-export')) })
+  $('in-track-vol')?.addEventListener('input', (e) => {
+    const t = findTrack(state.active)
+    if (!t) return
+    tracks.setVolumeDb(t, Number(e.target.value))
+    syncTrackDom(t)
+    renderMixer()
+  })
   $('btn-publish-confirm').addEventListener('click', () => { closeModal($('m-publish')); app.log('published to profile'); app.status('published') })
   $('btn-publish-dl').addEventListener('click', () => { closeModal($('m-publish')); app.exportWav() })
   $('btn-invite').addEventListener('click', () => {
@@ -1000,6 +1036,7 @@ export function attach(app) {
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
   }
+  renderFxBrowser()
   renderTrackList()
   renderSounds()
   renderVersions()

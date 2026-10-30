@@ -329,7 +329,7 @@ emit({"before": before, "after": after})
     })
 
     step(5, 'Analyze fills the peak meter with a dB value', `
-emit(click(".tabs [data-drawer=master]"))
+emit(click("[data-drawer=master]"))
 time.sleep(0.25)
 emit(click("#btn-analyze"))
 time.sleep(0.5)
@@ -341,7 +341,7 @@ emit(probe("return JSON.stringify({peak:(document.getElementById('meter-peak')||
       : { pass: false, detail: `peak=${show(d.peak)} rms=${show(d.rms)} gain=${show(d.gain)}` })
 
     step(6, 'Export logs a byte count and marks the project exported', `
-emit(click("[data-drawer=export]"))
+emit(click("#btn-export-tab"))
 time.sleep(0.3)
 emit(click("#btn-export"))
 time.sleep(8)
