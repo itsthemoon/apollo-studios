@@ -11,6 +11,7 @@ import * as compose from './compose.js'
 import * as automix from './automix.js'
 import { masterChain } from './master.js'
 import { encodeWav } from './wav.js'
+import { attach as attachStudio } from './studio.js'
 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const DIVISION = 4
@@ -28,6 +29,7 @@ const state = {
   harmonies: [],
   stems: null,
   demoDuration: null,
+  playhead: 0,
 }
 
 // ---- helpers ---------------------------------------------------------------
@@ -38,6 +40,27 @@ function log(msg) {
 }
 
 function status(text) { $('status').textContent = text }
+
+function playheadSeconds() { return state.playhead }
+
+/* bars are drawn to cover the take, not a fixed twenty */
+function buildRuler(bars = 24) {
+  const ruler = $('ruler')
+  const keep = ruler.querySelector('.loop-region')
+  ruler.innerHTML = Array.from({ length: bars }, (_, i) => `<span class="bar${i === 0 ? ' on' : ''}">${i + 1}</span>`).join('')
+  ruler.append(keep)
+}
+
+/* the lane maps pixels to seconds from the one-bar clip width (--ppb) */
+function setPlayheadFromEvent(e) {
+  const lane = $('lane')
+  const box = lane.getBoundingClientRect()
+  const ppb = parseFloat(getComputedStyle(lane).getPropertyValue('--ppb')) || 77
+  const barSeconds = (60 / Number($('in-bpm').value)) * 4
+  state.playhead = Math.max(0, ((e.clientX - box.left) / ppb) * barSeconds)
+  const head = $('playhead')
+  if (head) head.style.left = `${Math.max(0, e.clientX - box.left)}px`
+}
 
 function noteName(midi) {
   const m = Math.round(midi)
@@ -155,7 +178,7 @@ function drawWave() {
   const clip = document.querySelector('.clip')
   if (clip) {
     // a real take spans the whole arrangement; the default is one bar (--ppb)
-    clip.style.width = state.demoDuration ? '100%' : ''
+    clip.toggleAttribute('data-full', !!state.demoDuration)
     clip.title = state.demoDuration ? `${state.demoDuration.toFixed(1)} s take` : ''
     const w = Math.max(1, Math.round(clip.clientWidth - 20))
     if (canvas.width !== w) canvas.width = w
@@ -365,6 +388,10 @@ function applyCharacter() {
   $('voice-state').textContent = name
   $('mic-state').textContent = `character: ${name}`
   resetHarmonies()
+  const barSeconds = (60 / Number($('in-bpm').value)) * 4
+  buildRuler(Math.ceil(state.demoDuration / barSeconds) + 4)
+  state.playhead = 0
+  if ($('playhead')) $('playhead').style.left = '0px'
   drawWave()
   renderNotes()
   log(`voice: ${name}, ${out.length} samples, ${state.notes.length} notes re-detected`)
@@ -422,6 +449,10 @@ function recombineStems() {
   state.selected = null
   $('stem-readout').textContent = `recombined ${out.length} samples`
   resetHarmonies()
+  const barSeconds = (60 / Number($('in-bpm').value)) * 4
+  buildRuler(Math.ceil(state.demoDuration / barSeconds) + 4)
+  state.playhead = 0
+  if ($('playhead')) $('playhead').style.left = '0px'
   drawWave()
   renderNotes()
   log(`stems recombined: ${out.length} samples, ${state.notes.length} notes re-detected`)
@@ -442,6 +473,10 @@ function generateBeat() {
   state.notes = pitch.detectNotes(mixed, state.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
   resetHarmonies()
+  const barSeconds = (60 / Number($('in-bpm').value)) * 4
+  buildRuler(Math.ceil(state.demoDuration / barSeconds) + 4)
+  state.playhead = 0
+  if ($('playhead')) $('playhead').style.left = '0px'
   drawWave()
   renderNotes()
   log(`beat: ${genre} ${bars} bars, ${rendered.length} samples mixed, ${state.notes.length} notes`)
@@ -644,6 +679,10 @@ async function loadDemo() {
   $('in-snap').value = '0'
   $('out-snap').textContent = '0%'
   resetHarmonies()
+  const barSeconds = (60 / Number($('in-bpm').value)) * 4
+  buildRuler(Math.ceil(state.demoDuration / barSeconds) + 4)
+  state.playhead = 0
+  if ($('playhead')) $('playhead').style.left = '0px'
   drawWave()
   renderNotes()
   log(`demo: ${state.notes.length} notes detected`)
@@ -676,6 +715,7 @@ function boot() {
     { kind: 'peaking', freq: 3500, q: 1.2, gainDb: 0 },
     { kind: 'highshelf', freq: 8000, q: 0.71, gainDb: 0 },
   ]
+  buildRuler()
   renderBands()
   renderPresets()
   renderHarmonies()
@@ -765,7 +805,8 @@ function boot() {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); label.querySelector('input').click() }
     })
   })
-  document.querySelectorAll('[data-export]').forEach((el) => {
+  // #btn-export has its own listener above; this covers the extra data-export buttons
+  document.querySelectorAll('[data-export]:not(#btn-export)').forEach((el) => {
     el.addEventListener('click', guard(exportWav))
   })
 
@@ -800,6 +841,11 @@ function boot() {
     },
     split,
   }
+  const app = { state, log, status, openPanel, playheadSeconds, syncTuning, renderNotes, renderBands, exportWav }
+  state.studio = attachStudio(app)
+  $('lane').addEventListener('pointerdown', setPlayheadFromEvent)
+  $('lane').addEventListener('scroll', () => { const rr = $('ruler-row'); if (rr) rr.scrollLeft = $('lane').scrollLeft })
+  $('ruler').parentElement.classList.add('ruler-scroll')
   status('ready')
 }
 

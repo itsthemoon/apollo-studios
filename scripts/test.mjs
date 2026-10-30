@@ -1,7 +1,7 @@
 // scripts/test.mjs — single verification entry point for the whole goal.
 // Node 22. No dependencies. Exit 0 only when every check passes.
 import { spawnSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { test, testAsync, ok, eq, near, throws, report } from './lib/assert.mjs'
 import * as pitch from '../js/pitch.js'
 import * as tune from '../js/tune.js'
@@ -32,11 +32,16 @@ function phrase() {
 const take = phrase()
 
 // ---- 1. every module self-test still passes -------------------------------
+const SELFTESTS = readdirSync(new URL('.', import.meta.url))
+  .filter(f => /^selftest-.+\.mjs$/.test(f))
+  .sort()
+
 test('module self-tests', () => {
-  for (const name of ['input', 'tune', 'presets', 'master']) {
-    const run = spawnSync('node', [`scripts/selftest-${name}.mjs`], { encoding: 'utf8' })
-    eq(run.status, 0, `selftest-${name} exit code`)
-    ok((run.stdout || '').includes('ALL CHECKS PASSED'), `selftest-${name} reports pass`)
+  ok(SELFTESTS.length > 0, `found ${SELFTESTS.length} selftest files`)
+  for (const file of SELFTESTS) {
+    const run = spawnSync('node', [`scripts/${file}`], { encoding: 'utf8' })
+    eq(run.status, 0, `${file} exit code`)
+    ok((run.stdout || '').includes('ALL CHECKS PASSED'), `${file} reports pass`)
   }
 })
 

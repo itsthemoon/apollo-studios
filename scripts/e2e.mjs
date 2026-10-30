@@ -341,6 +341,8 @@ emit(probe("return JSON.stringify({peak:(document.getElementById('meter-peak')||
       : { pass: false, detail: `peak=${show(d.peak)} rms=${show(d.rms)} gain=${show(d.gain)}` })
 
     step(6, 'Export logs a byte count and marks the project exported', `
+emit(click("[data-drawer=export]"))
+time.sleep(0.3)
 emit(click("#btn-export"))
 time.sleep(1.6)
 emit(probe("return JSON.stringify({status:(document.getElementById('status')||{}).textContent||null,"
