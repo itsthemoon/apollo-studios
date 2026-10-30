@@ -1,6 +1,6 @@
 # Build
 
-Undertow has **no dependencies and no build step**. There is nothing to install, compile or bundle —
+Apollo Studios has **no dependencies and no build step**. There is nothing to install, compile or bundle —
 the browser loads the ES modules in `js/` exactly as they are on disk. A checkout runs immediately.
 
 ## Requirements

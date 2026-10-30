@@ -1,8 +1,8 @@
-# Undertow
+# Apollo Studios
 
 Sing it. Shape it. Ship it.
 
-Undertow is an open-source, local-only vocal studio that runs entirely in a browser tab. Sing a
+Apollo Studios is an open-source, local-only vocal studio that runs entirely in a browser tab. Sing a
 phrase, get editable notes back, tune them to a key, stack harmonies, shape a master, export a WAV.
 No account, no upload, no build step, no dependencies, and no backend beyond a static folder on
 loopback.
@@ -51,7 +51,7 @@ are in the tree. The audio maths are textbook — autocorrelation pitch tracking
 published, and the master chain is ordinary EQ, compression and limiting rather than anything
 reverse engineered.
 
-Undertow is independent and not affiliated with BandLab, Ableton or any other DAW vendor. Full note:
+Apollo Studios is independent and not affiliated with BandLab, Ableton or any other DAW vendor. Full note:
 [docs/NOT-AFFILIATED.md](docs/NOT-AFFILIATED.md).
 
 ## Verify

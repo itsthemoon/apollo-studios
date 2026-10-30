@@ -44,7 +44,7 @@ a:hover { text-decoration-color: var(--accent); }
 .top {
   border-bottom: 1px solid var(--line);
   position: sticky; top: 0;
-  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  background: color-mix(in srgb, var(--bg) 96%, transparent);
   backdrop-filter: blur(14px);
   z-index: 10;
 }
@@ -87,7 +87,7 @@ h1 {
 .cta .note { color: var(--dim); font-size: 13px; }
 
 /* ---- sections ------------------------------------------------------------- */
-section { padding: clamp(44px, 8vw, 88px) 0; border-bottom: 1px solid var(--line); }
+section { padding: clamp(44px, 8vw, 88px) 0; border-bottom: 1px solid var(--line); scroll-margin-top: 84px; }
 section > .wrap > h2 { margin: 0 0 10px; font-size: clamp(24px, 4vw, 34px); letter-spacing: -.025em; }
 section > .wrap > p.lead { margin: 0 0 36px; color: var(--dim); max-width: 62ch; }
 
@@ -132,7 +132,7 @@ footer .rule { border-top: 1px solid var(--line); padding-top: 20px; display: gr
 .side a:hover { color: var(--text); background: var(--sunk); }
 .side a[aria-current="page"] { color: var(--text); background: var(--sunk); box-shadow: inset 2px 0 0 var(--accent); }
 
-.prose { max-width: 72ch; }
+.prose { max-width: 72ch; min-width: 0; }
 .prose h1 { font-size: clamp(32px, 6vw, 46px); margin: 0 0 14px; }
 .prose .standfirst { color: var(--dim); font-size: 18px; margin: 0 0 32px; }
 .prose h2 { font-size: 22px; margin: 40px 0 12px; letter-spacing: -.015em; }

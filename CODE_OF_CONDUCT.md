@@ -8,7 +8,7 @@ accept that a maintainer may say no to good work for reasons of scope.
 ## Scope
 
 This applies to every project space: issues, pull requests, commit messages, reviews, discussion
-threads, and anywhere someone is speaking as a representative of Undertow.
+threads, and anywhere someone is speaking as a representative of Apollo Studios.
 
 ## Expected
 

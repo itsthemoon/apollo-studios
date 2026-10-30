@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Getting started — Undertow</title>
+<title>Getting started — Apollo Studios</title>
 <meta name="description" content="Serve the folder, open the studio, record a take or load the demo. Five minutes, no install.">
 <link rel="stylesheet" href="../styles-landing.css">
 </head>
@@ -12,7 +12,7 @@
 
 <header class="top">
   <div class="wrap top-in">
-    <a class="mark" href="../index.html"><span class="pip"></span>Undertow</a>
+    <a class="mark" href="../index.html"><span class="pip"></span>Apollo Studios</a>
     <nav aria-label="Primary">
       <a href="getting-started.html" aria-current="page">Docs</a>
       <a href="../app.html">Studio</a>
@@ -41,12 +41,12 @@
 
   <main id="main" class="prose">
     <h1>Getting started</h1>
-    <p class="standfirst">Undertow is a static folder. There is nothing to install, nothing to compile, and no service to sign into. You need a browser that can open a local page and, if you want to sing, a microphone.</p>
+    <p class="standfirst">Apollo Studios is a static folder. There is nothing to install, nothing to compile, and no service to sign into. You need a browser that can open a local page and, if you want to sing, a microphone.</p>
 
     <h2>1. Serve the folder</h2>
     <p>The page uses ES modules, so <code>file://</code> will not load it. Serve the directory over loopback with anything that speaks HTTP. The repository ships a dependency-free server purely so nobody has to think about this:</p>
     <pre><code>node scripts/serve.mjs</code></pre>
-    <p>That listens on <code>http://127.0.0.1:4173/</code>. Open it and the landing page loads; the studio is at <code>/app.html</code>. All six navigation links in the header of the studio point back here, so the two pages never drift apart.</p>
+    <p>That listens on <code>http://127.0.0.1:4173/</code>. Open it and the landing page loads; the studio is at <code>/app.html</code>. The landing header links every one of these pages, so the site stays joined up.</p>
     <p>Any other static server works. Python's <code>http.server</code>, a Bun script, or the dev server of an editor will all do, because the site is only HTML, CSS, JS and one JSON file of factory presets.</p>
 
     <h2>2. Open the studio</h2>

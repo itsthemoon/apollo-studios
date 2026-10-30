@@ -1,6 +1,6 @@
 # Not affiliated with BandLab
 
-Undertow is an independent project. It is **not affiliated with, endorsed by, or derived from the
+Apollo Studios is an independent project. It is **not affiliated with, endorsed by, or derived from the
 source code of BandLab**, Cakewalk, Soundtrap or any other DAW vendor.
 
 ## What "original" means here
@@ -30,7 +30,7 @@ boundaries and the patch format are this project's own.
 
 ## Their endpoints are theirs to change
 
-Undertow calls no remote API. There is no account, no sync, no cloud render and no analytics, so the
+Apollo Studios calls no remote API. There is no account, no sync, no cloud render and no analytics, so the
 app cannot break when someone else ships. That is a deliberate property, not an accident: the whole
 signal path — capture, detect, tune, master, encode — runs in the tab and the WAV is written by
 `Blob` from memory.
@@ -38,9 +38,9 @@ signal path — capture, detect, tune, master, encode — runs in the tab and th
 Where a comparison to another product is made in the notes or README, treat it as a description of
 observed behaviour at the time of writing. Those products can change their UI, their preset format or
 their rendering at any point, and this project makes no promise to track them. Preset import reads
-Undertow's own JSON (`js/presets.js`), not a BandLab export.
+Apollo Studios's own JSON (`js/presets.js`), not a BandLab export.
 
 ## Names and marks
 
 "BandLab", "Cakewalk" and "Soundtrap" are the property of their respective owners and are used here
-only to describe what was compared. "Undertow" is this project's name.
+only to describe what was compared. "Apollo Studios" is this project's name.

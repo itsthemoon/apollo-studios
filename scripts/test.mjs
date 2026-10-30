@@ -150,7 +150,7 @@ await testAsync('page serves', async () => {
   const landing = await fetch('http://127.0.0.1:4173/')
   eq(landing.status, 200, '/ serves')
   const html = await landing.text()
-  ok(html.includes('Undertow'), '/ is the Undertow landing page')
+  ok(html.includes('Apollo Studios'), '/ is the Apollo Studios landing page')
   ok(html.includes('href="app.html"'), '/ links to the studio')
 
   eq((await fetch('http://127.0.0.1:4173/app.html')).status, 200, '/app.html serves')
@@ -161,7 +161,7 @@ await testAsync('page serves', async () => {
   for (const page of ['getting-started', 'features', 'architecture', 'faq']) {
     const res = await fetch(`http://127.0.0.1:4173/docs/${page}.html`)
     eq(res.status, 200, `/docs/${page}.html serves`)
-    ok((await res.text()).includes('Undertow'), `docs/${page}.html is branded`)
+    ok((await res.text()).includes('Apollo Studios'), `docs/${page}.html is branded`)
   }
 })
 

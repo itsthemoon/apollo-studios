@@ -1,6 +1,6 @@
 # Contributing
 
-Undertow is a finished, small tool and it is deliberately boring to work on: no build, no
+Apollo Studios is a finished, small tool and it is deliberately boring to work on: no build, no
 dependencies, no framework. Keep it that way and a patch will land quickly.
 
 ## Before you start

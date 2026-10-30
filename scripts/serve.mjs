@@ -35,5 +35,5 @@ createServer(async (req, res) => {
     res.writeHead(404, { 'content-type': 'text/plain' }).end('not found')
   }
 }).listen(port, '127.0.0.1', () => {
-  console.log(`undertow on http://127.0.0.1:${port}/`)
+  console.log(`apollo-studios on http://127.0.0.1:${port}/`)
 })
