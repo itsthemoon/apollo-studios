@@ -89,10 +89,14 @@ function renderBands() {
     row.innerHTML = `
       <span>${band.kind}</span>
       <input type="range" min="30" max="16000" step="1" value="${band.freq}">
+      <output class="fq">${Math.round(band.freq)} Hz</output>
       <input type="range" min="-12" max="12" step="0.1" value="${band.gainDb}">
       <output>${band.gainDb.toFixed(1)} dB</output>`
     const [freq, gain] = row.querySelectorAll('input')
-    freq.addEventListener('input', () => { band.freq = Number(freq.value) })
+    freq.addEventListener('input', () => {
+      band.freq = Number(freq.value)
+      row.querySelector('.fq').textContent = `${Math.round(band.freq)} Hz`
+    })
     gain.addEventListener('input', () => {
       band.gainDb = Number(gain.value)
       row.querySelector('output').textContent = `${band.gainDb.toFixed(1)} dB`
@@ -606,8 +610,21 @@ function boot() {
   $('file-project').addEventListener('change', guard(async (e) => {
     const file = e.target.files?.[0]
     if (file) await openProject(file)
-    e.target.value = ''
-  }))
+    e.target.value = ''  }))
+
+  /* toolbar / rail / tab chrome: a drawer button scrolls its panel in; any Export button exports */
+  const openPanel = (name) => {
+    const panel = document.getElementById('p-' + name)
+    if (panel) panel.scrollIntoView({ block: 'start' })
+    document.body.classList.add('panel-open')
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.dataset.drawer === name))
+  }
+  document.querySelectorAll('[data-drawer]').forEach((el) => {
+    el.addEventListener('click', () => openPanel(el.dataset.drawer))
+  })
+  document.querySelectorAll('[data-export]').forEach((el) => {
+    el.addEventListener('click', guard(exportWav))
+  })
 
   const retune = () => { renderNotes() }
   $('in-root').addEventListener('change', retune)
