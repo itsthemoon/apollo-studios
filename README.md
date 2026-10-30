@@ -22,7 +22,7 @@ The studio's "load the demo take" button, in the lane, synthesizes a take, so ev
 
 ## What it does
 
-Twelve tools; four (`input`, `tune`, `presets`, `master`) carry self-tests that `scripts/test.mjs` spawns.
+Twenty-three tools; every module carries its own Node self-test and `scripts/test.mjs` spawns them all.
 
 | Module | Job |
 | --- | --- |

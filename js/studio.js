@@ -337,7 +337,9 @@ export function attach(app) {
       s.innerHTML = `<b>${t.name}</b>
         <input type="range" min="-60" max="6" value="${t.volumeDb}" step="0.5" aria-label="${t.name} fader" data-vol="${t.id}">
         <span class="db">${t.volumeDb.toFixed(1)}</span>
+        <span class="mlab">pan</span>
         <input type="range" min="-100" max="100" value="${t.pan * 100}" aria-label="${t.name} pan" data-pan="${t.id}">
+        <span class="db">${t.pan === 0 ? 'C' : t.pan < 0 ? `L${Math.round(-t.pan * 100)}` : `R${Math.round(t.pan * 100)}`}</span>
         <span class="mstag"><button class="ms" type="button" aria-label="Mute ${t.name}" data-mute="${t.id}" aria-pressed="${t.mute}">M</button>
         <button class="ms" type="button" aria-label="Solo ${t.name}" data-solo="${t.id}" aria-pressed="${t.solo}">S</button></span>`
       host.append(s)
@@ -523,6 +525,12 @@ export function attach(app) {
         <button class="ic mini" type="button" aria-label="Bypass ${spec.name}" data-bypass="${effect.id}">&#9678;</button>`
       host.append(row)
     })
+    if (!t.chain.effects.some(e => e.slug !== fx.LIMITER_SLUG)) {
+      const empty = document.createElement('p')
+      empty.className = 'hint'
+      empty.textContent = 'no effects yet — + Add effect opens the browser'
+      host.append(empty)
+    }
     const limiter = t.chain.effects.find(e => e.slug === fx.LIMITER_SLUG)
     if (!limiter) {
       const row = document.createElement('div')

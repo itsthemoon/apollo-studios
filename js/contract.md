@@ -96,6 +96,49 @@ Mono, via `getUserMedia` + `MediaRecorder` (fallback: `ScriptProcessorNode` accu
 `stop()` resolves with the recorded mono Float32Array at the context sample rate.
 Throws a readable Error when the mic is denied or unsupported.
 
+## js/tracks.js, js/automation.js  (owner: arrangement node)
+
+Track model (`createTrack`, `addTrack`, `removeTrack`, `moveTrack`, `duplicateTrack`,
+`toggleMute/Solo/Arm`, `setVolumeDb/Pan/Send`, `resolveSolo`, `summarise`) and
+automation lanes (`createLane`, `addPoint`, `removePoint`, `movePoint`, `read`,
+`normalise`, `simplify`). Volume clamps to -60..+6 dB, pan to -1..1, sends to 0..1.
+
+## js/fx.js  (owner: effects node, browser-only for `buildNodes`)
+
+14-effect catalog with parameter schemas, a chain model (`createChain`, `addEffect`,
+`moveEffect`, `removeEffect`, `setParam`, `setBypass`, `ensureLimiterLast`,
+`maxEffects`) and `buildNodes(ctx, effect)` for real Web Audio. The limiter is always
+last and capacity excludes it; free chains cap at 8 slots, membership at 16.
+
+## js/synth.js, js/roll.js, js/drums.js  (owner: instrument node)
+
+Polyphonic subtractive voices (`makeVoice`, `renderNotes`, `MUSICAL_TYPING`), a
+piano-roll model (`addNote`, `moveNote`, `resizeNote`, `quantize`, `lockToScale`,
+`overlapTrim`) and a 16-step drum sequencer with a synthesized nine-lane kit.
+
+## js/library.js, js/versions.js  (owner: browser node)
+
+Sound-browser data (packs, categories, samples with compact pattern defs, search,
+favourites, suggestions) and version snapshots (`createVersion`, `restore`, `prune`,
+`diffSummary`).
+
+## js/mastering2.js, js/autopitch.js  (owner: mastering node)
+
+Preset mastering (eight presets, intensity, three-band EQ, bypass, reference
+analysis, limiter-last chain order) and AutoPitch panel state (six presets with
+membership tiers, strength, scale, tonic grid, `detectKey`, `applyToNotes`).
+
+## js/shortcuts.js  (owner: ui node)
+
+Grouped key bindings with `find(ev)`, `format(binding)`, `byGroup`, `conflicts` and
+`isTypingTarget(el)`.
+
+## js/studio.js  (owner: ui node, browser-only)
+
+The multi-track shell: track rows, lane rows, mixer, automation canvases, roll
+editor, effect chain UI, AutoPitch and mastering panels, sounds browser, versions,
+lyrics, chat and the dialog/menu layer. Takes the `app` facade from `js/app.js`.
+
 ## js/app.js  (owner: ui node, browser-only)
 
 Wires the DOM ids in `app.html` to the modules above. Owns project state, playback
