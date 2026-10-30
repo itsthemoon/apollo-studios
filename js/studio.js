@@ -1036,6 +1036,7 @@ export function attach(app) {
   function escapeHtml(s) {
     return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
   }
+  if (new URLSearchParams(location.search).get('mixer') === '1') { $('mixer').hidden = false }
   renderFxBrowser()
   renderTrackList()
   renderSounds()
