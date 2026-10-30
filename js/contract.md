@@ -98,9 +98,9 @@ Throws a readable Error when the mic is denied or unsupported.
 
 ## js/app.js  (owner: ui node, browser-only)
 
-Wires the DOM ids in `index.html` to the modules above. Owns project state, playback
+Wires the DOM ids in `app.html` to the modules above. Owns project state, playback
 (`AudioContext`), and the export flow (`masterChain` -> `encodeWav` -> Blob download).
-Exposes `window.VS = { version, state, setState, exportWav, loadDemo }` for the QA harness.
+Exposes `window.VS = { version, state, setState, exportWav, loadDemo }` for the QA harness. (`VS` is the legacy Voice Studio initialism)
 
 ---
 

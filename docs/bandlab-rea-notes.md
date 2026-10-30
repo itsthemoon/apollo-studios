@@ -125,7 +125,7 @@ What was observed, and what `app.html` + `styles.css` now mirror:
 | Arrange canvas with a teal-tinted lane, a clip sized to time, faint bar grid | Lane with the same tint and grid, clip sized to one bar, waveform in the clip |
 | Bottom inspector: tab strip (AutoPitch / Fx / Editor) plus content panes | Tab strip (Take / Harmony / Voice / AutoMix & Tools / Presets / Mastering / Export); one panel at a time, arrow keys move |
 | Status bar with Lyrics/Notes, Sounds, Shortcuts at the right | Same bar, our status on the left |
-| Palette: near-black canvas, `#141416` panels, `#1e1e21` pills, red `#e0362c` record (`#f2493b` when armed), gold `#e8a92a` upsell, blue `#3e7bfa` AI, `#6fa8ff` snap, teal lane | Same values as CSS tokens |
+| Palette: near-black canvas, `#141416` panels, `#1e1e21` pills, red `#e0362c` record dot (`#f2493b` when armed), blue `#3e7bfa` AI badge, softer `#6fa8ff` snap and links, teal lane | Same values as CSS tokens |
 
 Deliberately **not** copied: their icons (we use text glyphs), their fonts (system stack), the
 Discover/New Track modal, the paywall, collaboration, and their track type list. Their shapes

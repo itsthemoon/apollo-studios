@@ -89,9 +89,9 @@ function renderBands() {
     row.className = 'band'
     row.innerHTML = `
       <span>${band.kind}</span>
-      <input type="range" min="30" max="16000" step="1" value="${band.freq}">
+      <input type="range" min="30" max="16000" step="1" value="${band.freq}" aria-label="${band.kind} frequency">
       <output class="fq">${Math.round(band.freq)} Hz</output>
-      <input type="range" min="-12" max="12" step="0.1" value="${band.gainDb}">
+      <input type="range" min="-12" max="12" step="0.1" value="${band.gainDb}" aria-label="${band.kind} gain">
       <output>${band.gainDb.toFixed(1)} dB</output>`
     const [freq, gain] = row.querySelectorAll('input')
     freq.addEventListener('input', () => {
@@ -113,9 +113,16 @@ function renderNotes() {
     const row = document.createElement('div')
     row.className = 'note' + (i === state.selected ? ' sel' : '')
     row.setAttribute('role', 'listitem')
+    row.tabIndex = 0
     const start = note.start.toFixed(2)
     const cents = Number.isFinite(note.cents) ? `${note.cents > 0 ? '+' : ''}${note.cents.toFixed(0)}c` : '0c'
     row.innerHTML = `<span>${start}s</span><span>${noteName(note.midi)}</span><span>${cents}</span><button aria-label="Delete the note at ${start}s, ${noteName(note.midi)}">Del</button>`
+    row.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return
+      e.preventDefault()
+      state.selected = i
+      renderNotes()
+    })
     row.addEventListener('click', (e) => {
       if (e.target.tagName === 'BUTTON') { state.notes.splice(i, 1); state.selected = null }
       else state.selected = i
@@ -159,24 +166,41 @@ function drawWave() {
   if (!state.take?.length) return
   const mid = canvas.height / 2
   const step = Math.max(1, Math.floor(state.take.length / canvas.width))
-  /* RMS per column reads like a waveform; raw peaks in a dense mix are a flat block */
+  /* dB scale, 48 dB of range. Linear normalisation clamps every loud column to full
+     height on a mastered mix and the waveform turns into slabs. */
+  const DB = 24
+  const d = (v) => Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6)) + DB) / DB))
   const rms = new Float32Array(canvas.width)
-  let loudest = 0
+  const peaks = new Float32Array(canvas.width)
   for (let x = 0; x < canvas.width; x++) {
     let sum = 0, n = 0
-    for (let i = x * step; i < (x + 1) * step && i < state.take.length; i++, n++) sum += state.take[i] * state.take[i]
+    for (let i = x * step; i < (x + 1) * step && i < state.take.length; i++, n++) {
+      const v = state.take[i]
+      sum += v * v
+      peaks[x] = Math.max(peaks[x], Math.abs(v))
+    }
     rms[x] = n ? Math.sqrt(sum / n) : 0
-    loudest = Math.max(loudest, rms[x])
   }
-  const scale = (mid - 2) / Math.max(0.004, loudest)
+
   g.strokeStyle = '#6fa8ff'
   g.beginPath()
   for (let x = 0; x < canvas.width; x++) {
-    const amp = Math.min((mid - 2) * 0.86, Math.pow(rms[x] * scale / (mid - 2), 0.7) * (mid - 2))
+    const amp = d(rms[x]) * (mid - 2) * 0.92
     g.moveTo(x + 0.5, mid - amp)
     g.lineTo(x + 0.5, mid + amp)
   }
   g.stroke()
+
+  g.beginPath()
+  for (let x = 0; x < canvas.width; x++) {
+    const h = d(peaks[x]) * (mid - 1)
+    g.moveTo(x + 0.5, mid - h)
+    g.lineTo(x + 0.5, mid + h)
+  }
+  g.globalAlpha = 0.4
+  g.stroke()
+  g.globalAlpha = 1
+
   g.strokeStyle = '#2c4a52'
   g.beginPath()
   g.moveTo(0, mid + 0.5)
@@ -515,7 +539,11 @@ function applyPatch(patch, label) {
   }
   state.bands = m.eq.map(b => ({ ...b }))
   renderBands()
-  document.querySelectorAll('#preset-list button').forEach(b => b.classList.toggle('on', b.dataset.name === label))
+  document.querySelectorAll('#preset-list button').forEach(b => {
+    const on = b.dataset.name === label
+    b.classList.toggle('on', on)
+    b.setAttribute('aria-pressed', String(on))
+  })
   $('preset-state').textContent = label
   renderNotes()
 }
@@ -677,6 +705,14 @@ function boot() {
     download(new Blob([presets.serializePatch(patch)], { type: 'application/json' }), `${patch.name}.json`)
     log(`preset exported: ${patch.name}`)
   }))
+  // the file pickers sit behind labels; labels are not focusable targets by themselves
+  document.querySelectorAll('label[role="button"]').forEach((label) => {
+    label.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return
+      e.preventDefault()
+      label.querySelector('input[type=file]')?.click()
+    })
+  })
   $('file-preset').addEventListener('change', guard(async (e) => {
     const file = e.target.files?.[0]
     if (!file) return

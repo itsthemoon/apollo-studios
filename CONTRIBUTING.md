@@ -39,7 +39,7 @@ pull request. "It saved three lines" is not enough; the answer is usually that i
 4. Numbers stay finite. Guard divide-by-zero, return zero pitch for silence, never emit `NaN`.
 5. Errors are `Error` objects with a short lowercase message.
 6. Every module exports get a self-test in `scripts/selftest-<module>.mjs` that ends with
-   `ALL CHECKS PASSED` on success, and `scripts/test.mjs` spawns it.
+   `ALL CHECKS PASSED` on success, and `scripts/test.mjs` spawns it — currently four of them, so wire any new one in.
 7. Public signatures change in `js/contract.md` and `js/contract-appendix.md` first, and in the
    same commit as the code.
 
@@ -73,10 +73,9 @@ line does. No emoji in the source or the docs.
 
 ## Site changes
 
-`index.html` and `styles-landing.css` are the public face; `app.html` is the studio. Keep the
-palette in both, but not the same one. The landing stays `#0b0b0f` canvas, `#ececf2` text,
-`#8b8b9a` muted, `#bf5af2` accent used sparingly, `#26262f` hairlines. The studio is `#0a0a0b` canvas,
-`#ececf0` text, `#a8a8ab` muted, `#3e7bfa` accent, `#e0362c` record, teal `#0e1517` lane. System font
+`index.html` and `styles-landing.css` are the public face; `app.html` is the studio. Keep each
+palette: the landing stays `#0b0b0f` / `#bf5af2`; the studio stays `#0a0a0b` canvas, `#ececf0` text,
+`#a8a8ab` muted, `#3e7bfa` accent, `#f2493b` record, no purple. System font
 stack throughout. Focus rings must stay visible on every interactive element.
 Copy is plain and specific — no exclamation marks, no superlatives that the code cannot back up.
 

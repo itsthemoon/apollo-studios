@@ -5,7 +5,7 @@ source code of BandLab**, Cakewalk, Soundtrap or any other DAW vendor.
 
 ## What "original" means here
 
-Every file in `js/`, `index.html`, `app.html` and `styles.css` was written for this project. Nothing
+Every file in `js/`, every `.html` page and both stylesheets was written for this project. Nothing
 was copied in, and no third-party code, preset data, sample audio, icon set or stylesheet is
 vendored.
 

@@ -12,17 +12,17 @@ node scripts/serve.mjs      # http://127.0.0.1:4173 — landing page, studio at 
 node scripts/test.mjs       # full verification, exit 0 = pass
 ```
 
-The studio's "Load demo" button synthesizes a take, so everything works with no microphone.
+The studio's "load the demo take" button, in the lane, synthesizes a take, so everything works with no microphone.
 
 ## Site
 
 - `index.html` + `styles-landing.css` — public landing page
 - `app.html` — the studio itself
-- `docs/` — getting started, features, architecture, FAQ
+- `docs/` — getting-started/features/architecture/FAQ pages plus BUILD, NOT-AFFILIATED and the BandLab RE notes
 
 ## What it does
 
-Twelve tools, each a pure module with a Node self-test:
+Twelve tools; four (`input`, `tune`, `presets`, `master`) carry self-tests that `scripts/test.mjs` spawns.
 
 | Module | Job |
 | --- | --- |

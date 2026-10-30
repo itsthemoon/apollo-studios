@@ -21,7 +21,7 @@ Starts `scripts/serve.mjs` on <http://127.0.0.1:4173>. Override the port with `P
 The server is a ~40-line static file server with no caching and correct MIME types; it is for local
 use and is not intended to be exposed to the internet.
 
-Open the page, then either press **Record** (allow the mic prompt) or press **Load demo** to work with
+Open the page, then either press **Record** (allow the mic prompt) or press **load the demo take** in the lane dropzone to work with
 a synthetic take and skip the microphone entirely.
 
 ## Test
@@ -48,7 +48,7 @@ down afterwards, then runs the full suite. This is the command to use from a col
 
 ## Layout of the suite
 
-- `scripts/selftest-*.mjs` — per-module checks (`input`, `tune`, `presets`, `master`)
+- `scripts/selftest-*.mjs` — ten per-module checks; `test.mjs` spawns four (`input`, `tune`, `presets`, `master`), six await wiring, `wav.js` has none
 - `scripts/test.mjs` — the whole suite, including the DOM wiring and HTTP assertions
 - `scripts/e2e.mjs` — server lifecycle wrapper around `test.mjs`
 

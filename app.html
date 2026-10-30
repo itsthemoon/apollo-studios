@@ -12,7 +12,7 @@
   <div class="tb-row tb-row-1">
     <button class="ic hamburger" type="button" aria-label="Menu">&#9776;</button>
     <h1 class="wordmark"><span class="flame" aria-hidden="true"></span>Apollo&nbsp;Studios</h1>
-    <button class="getpill" type="button"><span>Get</span><span class="crown" aria-hidden="true">&#9825;</span></button>
+    <button class="getpill" type="button" aria-label="Get Apollo Pro"><span>Get</span><span class="crown" aria-hidden="true">&#9825;</span></button>
 
     <span class="projwrap"><input id="proj-name" class="proj" value="demo session" aria-label="Project name"></span>
 
@@ -42,7 +42,7 @@
       <button id="btn-record" class="rec" type="button" aria-label="Record"><span class="rec-dot"></span></button>
       <label class="loop" title="Quantize to the grid"><input id="in-quantize" type="checkbox" aria-label="Quantize to the grid"><span aria-hidden="true">&#8635;</span></label>
       <span class="divider" aria-hidden="true"></span>
-      <span id="rec-timer" class="clock">00:00.0</span>
+      <span id="rec-timer" class="clock" role="timer" aria-label="Recording time">00:00.0</span>
     </div>
 
     <button class="mastering" type="button" data-drawer="master">
@@ -138,8 +138,8 @@
       <div class="lane-grid" aria-hidden="true"></div>
       <div class="playhead" aria-hidden="true"></div>
       <div class="clip">
-        <div class="clip-head"><b><i class="tnum">01</i> Voice/Audio</b></div>
-        <canvas id="wave" width="1200" height="120"></canvas>
+        <div class="clip-head"><h3><i class="tnum">01</i> Voice/Audio</h3></div>
+        <canvas id="wave" width="1200" height="120" role="img" aria-label="Waveform of the voice take"></canvas><span class="sr-only" id="wave-alt">Audio waveform of the loaded take.</span>
       </div>
       <p class="dropzone">Drop a loop or an audio/MIDI/video file — or press Record, or <button id="btn-demo" class="linkish" type="button">load the demo take</button></p>
     </div>
@@ -151,7 +151,7 @@
   </section>
 </main>
 
-<footer class="inspector">
+<section class="inspector" aria-label="Inspector">
   <div class="tabs" role="tablist" aria-label="Studio panels">
     <button class="tab" role="tab" id="tab-harmony" aria-controls="p-harmony" aria-selected="false" tabindex="-1" type="button" data-drawer="harmony"><span aria-hidden="true">&#9834;</span> AutoPitch&trade;</button>
     <button class="tab" role="tab" id="tab-voice" aria-controls="p-voice" aria-selected="false" tabindex="-1" type="button" data-drawer="voice">Fx Effects</button>
@@ -165,7 +165,7 @@
 
   <div class="ins-body" id="ins-body">
     <section class="panel" id="p-take" role="tabpanel" aria-labelledby="tab-take">
-      <div class="panel-head"><h2>Editor</h2><span id="note-count" class="hint">no notes</span></div>
+      <div class="panel-head"><h2>Editor</h2><span id="note-count" class="hint" role="status" aria-live="polite">no notes</span></div>
       <div id="note-list" class="notes" role="list" aria-label="Detected notes"></div>
       <p class="hint">Each row can be deleted. The snap slider at the top of the lane sets how hard the take is pulled to the key.</p>
     </section>
@@ -264,10 +264,10 @@
       <pre id="log" class="log" aria-live="polite"></pre>
     </section>
   </div>
-</footer>
+</section>
 
 <div class="statusbar">
-  <span class="ready" id="status">ready</span>
+  <span class="ready" id="status" role="status" aria-live="polite">ready</span>
 </div>
 
 <script type="module" src="js/app.js"></script>
