@@ -609,6 +609,12 @@ async function loadDemo() {
   state.notes = (await detectTakeNotes(take, buffer.sampleRate)).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
   $('mic-state').textContent = 'skin'
+  $('proj-name').value = 'Skin'
+  const head = document.querySelector('.clip-head b')
+  if (head) head.textContent = 'Skin'
+  // raw take: leave the take off the grid so autotune has visible work to do
+  $('in-snap').value = '0'
+  $('out-snap').textContent = '0%'
   resetHarmonies()
   drawWave()
   renderNotes()
