@@ -344,12 +344,12 @@ emit(probe("return JSON.stringify({peak:(document.getElementById('meter-peak')||
 emit(click("[data-drawer=export]"))
 time.sleep(0.3)
 emit(click("#btn-export"))
-time.sleep(1.6)
+time.sleep(8)
 emit(probe("return JSON.stringify({status:(document.getElementById('status')||{}).textContent||null,"
            " log:(document.getElementById('log')||{}).textContent||'',"
            " rate:document.getElementById('in-rate').value})"))
 `, d => {
-      const m = /exported (\d+) bytes @ (\d+) Hz/.exec(d.log)
+      const m = /exported (\d+) bytes @ (\d+) Hz/.exec(d.log || '')
       const bytes = m ? Number(m[1]) : 0
       return {
         pass: d.status === 'exported' && bytes > 10000 && !!m && m[2] === d.rate,

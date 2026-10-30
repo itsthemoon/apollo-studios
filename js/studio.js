@@ -528,7 +528,7 @@ export function attach(app) {
     if (!t.chain.effects.some(e => e.slug !== fx.LIMITER_SLUG)) {
       const empty = document.createElement('p')
       empty.className = 'hint'
-      empty.textContent = 'no effects yet — + Add effect opens the browser'
+      empty.textContent = 'the safety limiter is all that is loaded — + Add effect builds the chain'
       host.append(empty)
     }
     const limiter = t.chain.effects.find(e => e.slug === fx.LIMITER_SLUG)
