@@ -105,3 +105,31 @@ Platform API is versioned (`www.bandlab.com/api/v3.0` … `v4.3`), auth through 
 - Their half-slots-for-free-accounts split maps onto anything we later do about limits.
 
 Nothing of theirs is copied: the engine is theirs, our implementation is our own.
+
+## Second REA pass — the studio UI itself
+
+The first pass read the network surface. The second opened a real Studio project in a logged-in
+tab and read the shell: layout, palette, control vocabulary, panel structure. Method: CDP over the
+user's own Chrome, DOM read + computed styles + screenshots, nothing executed inside their engine,
+nothing uploaded. Screens: `s1` empty project + Discover modal, `s2` shell, `s4` one Voice/Audio
+track, `s5` AutoMix row and its paywall panel.
+
+What was observed, and what `app.html` + `styles.css` now mirror:
+
+| Observed | Mirrored as |
+| --- | --- |
+| Two-row header: hamburger, flame logo, wordmark, gold crown "Get", project title, "Last Saved", Save, Publish | Same rows: wordmark, gold Get pill, session name, Last Saved, Save, Export WAV |
+| Transport bar: undo/redo, metronome, `120 bpm`, `4 / 4`, Key, play / return / record / loop, `00:00.0`, Mastering "Select Preset", master volume + dB, Invite | Undo/redo, metronome, the real BPM input, 4/4, Key = our root select, stop/play/record/loop, timer, Mastering pill, gain + dB |
+| Left rail: "+ Add Track", then a track header (mic icon, M, S, + Fx, volume), then an AutoMix row with a blue AI badge and a gold crown | Same rail, same header controls, AutoMix + Harmony rows with AI badges, statuses under each |
+| Ruler of numbered bars with bar 1 tinted dark red, snap magnet and zoom at the right | Same ruler, tinted bar 1, snap slider and zoom at the lane's top right |
+| Arrange canvas with a teal-tinted lane, a clip sized to time, faint bar grid | Lane with the same tint and grid, clip sized to one bar, waveform in the clip |
+| Bottom inspector: tab strip (AutoPitch / Fx / Editor) plus content panes | Tab strip (Take / Harmony / Voice / AutoMix & Tools / Presets / Mastering / Export) that opens the drawer |
+| Status bar with Lyrics/Notes, Sounds, Shortcuts at the right | Same bar, our status on the left |
+| Palette: near-black canvas, `#141416` panels, `#1e1e21` pills, red `#f2493b` record, gold `#e8a92a` upsell, blue `#3e7bfa` AI/snap, teal lane | Same values as CSS tokens |
+
+Deliberately **not** copied: their icons (we use text glyphs), their fonts (system stack), the
+Discover/New Track modal, the paywall, collaboration, and their track type list. Their shapes
+change; ours only borrows the structure.
+
+Mapping note: BandLab's premium features are remote job APIs, so a faithful-looking chrome is the
+honest ceiling for a local clone — the controls look the same and do the local equivalent.
