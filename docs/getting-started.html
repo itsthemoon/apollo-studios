@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Getting started — Undertow</title>
+<meta name="description" content="Serve the folder, open the studio, record a take or load the demo. Five minutes, no install.">
+<link rel="stylesheet" href="../styles-landing.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="mark" href="../index.html"><span class="pip"></span>Undertow</a>
+    <nav aria-label="Primary">
+      <a href="getting-started.html" aria-current="page">Docs</a>
+      <a href="../app.html">Studio</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc">
+  <aside class="side">
+    <p>Documentation</p>
+    <ul>
+      <li><a href="../index.html">Overview</a></li>
+      <li><a href="getting-started.html" aria-current="page">Getting started</a></li>
+      <li><a href="features.html">Features</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+    </ul>
+    <p>Project</p>
+    <ul>
+      <li><a href="../app.html">Open the studio</a></li>
+      <li><a href="../CONTRIBUTING.md">Contributing</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="prose">
+    <h1>Getting started</h1>
+    <p class="standfirst">Undertow is a static folder. There is nothing to install, nothing to compile, and no service to sign into. You need a browser that can open a local page and, if you want to sing, a microphone.</p>
+
+    <h2>1. Serve the folder</h2>
+    <p>The page uses ES modules, so <code>file://</code> will not load it. Serve the directory over loopback with anything that speaks HTTP. The repository ships a dependency-free server purely so nobody has to think about this:</p>
+    <pre><code>node scripts/serve.mjs</code></pre>
+    <p>That listens on <code>http://127.0.0.1:4173/</code>. Open it and the landing page loads; the studio is at <code>/app.html</code>. All six navigation links in the header of the studio point back here, so the two pages never drift apart.</p>
+    <p>Any other static server works. Python's <code>http.server</code>, a Bun script, or the dev server of an editor will all do, because the site is only HTML, CSS, JS and one JSON file of factory presets.</p>
+
+    <h2>2. Open the studio</h2>
+    <p>Go to <code>/app.html</code>, or press <strong>Open the studio</strong> on the landing page. The transport sits at the top: record, play, stop, and the tempo and key controls that tuning is measured against.</p>
+    <p>If you have no microphone, or do not want to use one, press <strong>Load demo</strong> in the header. It synthesizes a short sung phrase with real pitch content, so every control downstream is usable in a few seconds. The demo is the same path the test suite exercises, which is why the tests can assert note counts and pitches without a room to record in.</p>
+
+    <h2>3. Make something</h2>
+    <p>Sing or load the demo, then work left to right through the panels. Tuning takes a strength value between zero and one: at zero the take is untouched, at one every note lands on the nearest legal pitch in the key. Pick a scale that fits the melody before pushing that dial, or the tune will sound like it is fighting you.</p>
+    <p>Presets carry the tuning, the vocal character and the whole master setting. The factory patches are deliberately mild; the interesting ones are the changes you make and then export as your own.</p>
+
+    <h2>4. Export</h2>
+    <p><strong>Export WAV</strong> renders through the master chain and hands you a 16-bit stereo file at 44.1 or 48 kHz. Nothing is written to the disk until you click, and the browser's download shelf is the only place the file appears.</p>
+    <blockquote>Watch the meter while the chain runs. The peak readout is measured after the limiter, not before, so a ceiling of -1 dB means the file leaves at -1 dB.</blockquote>
+
+    <h2>Requirements</h2>
+    <table>
+      <tr><th>Browser</th><td>Chromium, Firefox and Safari from the last two years. Microphone capture needs a secure context, which loopback satisfies.</td></tr>
+      <tr><th>Node</th><td>22 or newer, but only if you use the bundled server or the test suite. The studio itself does not need Node at runtime.</td></tr>
+      <tr><th>Permissions</th><td>Microphone access is requested once, on the first record press. Denying it leaves the rest of the studio intact.</td></tr>
+    </table>
+
+    <h2>Verify the copy you have</h2>
+    <p>If you cloned this from anywhere, run the suite before trusting it:</p>
+    <pre><code>node scripts/test.mjs</code></pre>
+    <p>It exits zero only when all four module self-tests pass, the audio path behaves, the WAV header is byte-correct and the site serves. Anything else is a real failure, not a warning.</p>
+
+    <p class="next"><a href="features.html">Next: what every control does</a><a href="faq.html">FAQ</a></p>
+  </main>
+</div>
+</body>
+</html>

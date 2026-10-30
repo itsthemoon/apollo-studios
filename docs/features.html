@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Features — Undertow</title>
+<meta name="description" content="What each Undertow control actually does, what it is built on, and where the honest edges are.">
+<link rel="stylesheet" href="../styles-landing.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="mark" href="../index.html"><span class="pip"></span>Undertow</a>
+    <nav aria-label="Primary">
+      <a href="features.html" aria-current="page">Docs</a>
+      <a href="../app.html">Studio</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc">
+  <aside class="side">
+    <p>Documentation</p>
+    <ul>
+      <li><a href="../index.html">Overview</a></li>
+      <li><a href="getting-started.html">Getting started</a></li>
+      <li><a href="features.html" aria-current="page">Features</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+    </ul>
+    <p>Project</p>
+    <ul>
+      <li><a href="../app.html">Open the studio</a></li>
+      <li><a href="../CONTRIBUTING.md">Contributing</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="prose">
+    <h1>Features</h1>
+    <p class="standfirst">Twelve tools, described the way they are actually built. Where a piece is a cheap approximation of something expensive, this page says so instead of dressing it up.</p>
+
+    <p>Every module below is a pure function over <code>Float32Array</code> or plain note objects. None of them touch the DOM, none of them fetch, and each has a Node self-test that runs in the suite before the browser is involved. If a control misbehaves, the bug is in the wiring, not in the maths — because the maths is already asserted.</p>
+
+    <h2>Autotune</h2>
+    <p>Pitch detection runs normalized autocorrelation per 2048-sample frame with a 512-sample hop. Frames whose clarity falls under half are discarded, and neighbouring frames within 50 cents of each other merge into one note. That note list is what tuning operates on: each note is moved toward the nearest pitch class in the chosen scale, by a strength proportional to the dial.</p>
+    <p>Strong settings are deliberately robotic. Weak settings leave the vibrato mostly intact and only pull the entries and exits. Nothing is pitch-shifted in the time domain by a phase vocoder; the take is resampled along a per-sample speed curve, so extreme settings thicken the top end the way tape varispeed does.</p>
+
+    <h2>Harmonies</h2>
+    <p>Four interval presets: diatonic thirds, fifths, an octave down and a wide stack. Each interval becomes its own copy of the note list, transposed and labelled, with a gain and a millisecond spread so the copies do not stack into a single comb-filtered lump.</p>
+    <p>Harmonies follow the notes you sang rather than the chord grid. That means a third above is a real third even when the key changes mid-phrase, but it also means a harmony can land on a note you did not intend if the source note was wrong. Fix the take before adding parts.</p>
+
+    <h2>Voice characters</h2>
+    <p>Each character is a tuple: a pitch shift in semitones, a treble tilt, a soft drive amount and a breath-noise mix. Pitch is a resample ratio of <code>2 ** (semis / 12)</code>; the tilt is a single high shelf; the drive is <code>tanh</code> with a scaled input; the breath is mixed noise under the signal.</p>
+    <p>It is a character kit, not a formant shifter. The shifts change the whole formant picture along with the pitch, which is why the settings stop at about an octave and why a big downward shift sounds like a slower singer rather than a different person.</p>
+
+    <h2>Stem split</h2>
+    <p>A frame-based median split at 2048/512. For each frequency bin, the median across the neighbouring frames is treated as the harmonic estimate; the residual is the percussive part. Both stems come back at the original length and <code>recombine</code> sums them to within a thousandth of the input.</p>
+    <p>That is a two-bus separation with no model, no training and no per-instrument awareness. On a solo vocal it works as a de-noise and de-breath tool. On a dense mix it smears, and on anything with a lot of low mid it leaves artefacts. The FAQ has a longer answer on why it is like this.</p>
+
+    <h2>Beat generator</h2>
+    <p>Four genres, each with a tempo, a swing amount and three synthesized voices: a pitch-swept sine kick, a noise-burst snare with a body tone under it, and a highpassed noise hat. Output length is bars against the genre tempo, four beats to the bar, and the render is deterministic — the same genre and bar count gives the same samples every time.</p>
+    <p>There are no samples in the repository. Every drum hit is arithmetic, which keeps the folder small and the build absent, and means the kit is a sketch pad rather than a drum library.</p>
+
+    <h2>Melody generator</h2>
+    <p>A seeded <code>mulberry32</code> walk. The generator takes a root, a scale, a step count and a tempo, then moves through scale degrees by one or two positions at a time, staying inside the key. The same seed reproduces the same line exactly, so an idea survives a reload.</p>
+    <p>It does not model phrase shape or contour. Lines wander. Treat the output as material to keep three bars of, not as a finished top line.</p>
+
+    <h2>Chord generator</h2>
+    <p>Triads stacked from scale degrees, one per bar, seeded the same way. Because the triads are built inside the scale, they stay functionally coherent in the key even when the voicings are plain.</p>
+    <p>Every chord is a root-position triad. Inversions are something you do by ear afterwards with the note editor.</p>
+
+    <h2>Automix</h2>
+    <p>Two parts. The first suggests a partial master setting derived from the genre's brightness and density, which is a starting EQ curve and compressor setting rather than a mix. The second, <code>balance</code>, takes a set of track levels and returns per-track trims that pull them toward a common target, clamped between -24 and +12 dB and never boosting the loudest track.</p>
+    <p>It is a rule of thumb written as code. It has no idea what is in the tracks, so it will happily make a quiet, important part louder than it should be.</p>
+
+    <h2>Mastering chain</h2>
+    <p>The chain order is fixed: EQ, compressor, loudness normalization, limiter. Bands are RBJ biquads — highpass, lowpass, peaking and shelves — set from the patch. The compressor has threshold, ratio, attack, release and makeup. Normalization brings the RMS to the target, and the limiter sits on the ceiling with lookahead.</p>
+    <p>After the chain, the meter measures the true output peak rather than the pre-limiter value, so the readout is what the file will contain. A neutral patch reduces to something very close to transparent, which the test asserts.</p>
+
+    <h2>Presets</h2>
+    <p>Patches are versioned JSON: tuning, master bands and compressor, ceiling, target loudness, vocal gain and reverb mix. <code>validatePatch</code> rejects the wrong version, an amount outside zero to one, more than eight bands, non-finite numbers and a missing name. Import goes through the same validator, so a malformed file is refused whole rather than applied until the first bad key.</p>
+    <p>Six factory patches ship in <code>presets/builtin.json</code>. Export writes your own; nothing is sent anywhere to do it.</p>
+
+    <h2>WAV export</h2>
+    <p>16-bit stereo PCM with a byte-exact 44-byte RIFF header, at 44.1 or 48 kHz. Samples are rounded and clipped to the int16 range. The tests check the magic, the channel count, the bit depth, the rate and the exact body length, then write a real file and read it back.</p>
+    <p>The bit-depth selector offers 24-bit but the encoder writes 16. That is a known gap, not a hidden one.</p>
+
+    <h2>Project save</h2>
+    <p>A project file holds the take, the notes and the patch in one JSON document, saved through the browser's download shelf and reopened with a file picker. It is intentionally the same shape as the preset file plus the audio, so a project can be read by hand.</p>
+    <p>Sample rate travels with the take. Opening a project recorded at another rate warns before it reloads, because a mismatch quietly detunes everything.</p>
+
+    <p class="next"><a href="architecture.html">Next: how it is put together</a><a href="faq.html">FAQ</a></p>
+  </main>
+</div>
+</body>
+</html>

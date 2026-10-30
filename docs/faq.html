@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FAQ — Undertow</title>
+<meta name="description" content="Licence, data locality, why the stem split is crude, and the other questions the README would otherwise dodge.">
+<link rel="stylesheet" href="../styles-landing.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="mark" href="../index.html"><span class="pip"></span>Undertow</a>
+    <nav aria-label="Primary">
+      <a href="faq.html" aria-current="page">Docs</a>
+      <a href="../app.html">Studio</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc">
+  <aside class="side">
+    <p>Documentation</p>
+    <ul>
+      <li><a href="../index.html">Overview</a></li>
+      <li><a href="getting-started.html">Getting started</a></li>
+      <li><a href="features.html">Features</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+      <li><a href="faq.html" aria-current="page">FAQ</a></li>
+    </ul>
+    <p>Project</p>
+    <ul>
+      <li><a href="../app.html">Open the studio</a></li>
+      <li><a href="../CONTRIBUTING.md">Contributing</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="prose">
+    <h1>FAQ</h1>
+    <p class="standfirst">The questions that decide whether this tool is for you, answered before you invest an evening in it.</p>
+
+    <h2>What licence is it under?</h2>
+    <p>MIT. The full text is in <code>LICENSE</code>: use it, modify it, redistribute it, sell something built with it, keep the copyright line. There is no contributor licence agreement and no dual licence to negotiate.</p>
+    <p>The one thing MIT asks is that you do not hold the author liable when it misbehaves. Given that the export path writes raw PCM from JavaScript in a browser tab, that clause is doing real work.</p>
+
+    <h2>Where does my audio go?</h2>
+    <p>Nowhere. Capture, pitch analysis, tuning, harmonies, mastering and WAV encoding all run in the page. The only network request the studio makes after load is none at all, because there are no fonts, no CDN scripts and no analytics.</p>
+    <p>The static server is loopback and has no logging or upload route. You can pull the ethernet cable after the page loads and keep working, including exporting. The one place your audio reaches the disk is the download shelf, when you press export or save.</p>
+    <p>That also means no sync, no share links and no backup. If you want the project on another machine, carry the JSON file yourself.</p>
+
+    <h2>Why is the stem split so crude?</h2>
+    <p>Because a real separator is a trained model of several megabytes, usually a web assembly build of an inference runtime, and a model would have broken the two rules this project set: no build step and no runtime dependency. The split is a frame-median harmonic and percussive decomposition — cheap, explainable, about forty lines, and it recombines to the original within a thousandth.</p>
+    <p>What that buys you: on a solo vocal it removes breaths, room and mouth noise well enough to work with. What it costs: on a dense mix it smears transients, thins the low mid, and leaves artefacts that sound like a bad MP3. It is a filter with a name, not a stem separator, and the UI never calls it one.</p>
+    <p>If you need real separation, run a model elsewhere and import the parts. The project has a place for that in future, not a promise of it now.</p>
+
+    <h2>Is it really open source, or source-available?</h2>
+    <p>Open source under an OSI licence, with the whole working app in the repository — not a shell around a hosted service. There is no paid tier, no account server and no feature held back for a cloud build.</p>
+
+    <h2>How does it relate to BandLab?</h2>
+    <p>It is independent. BandLab's web studio was studied as a shipped product, and the notes are in <code>docs/bandlab-rea-notes.md</code>. No BandLab code, preset data, names or assets are in the tree; the DSP is textbook autocorrelation and published RBJ biquads.</p>
+    <p>The result is a much smaller tool. There are no loops, no collaboration, no cloud projects and no mobile app.</p>
+
+    <h2>Why 24-bit in the menu if the file is 16-bit?</h2>
+    <p>The selector was built ahead of the encoder and never finished. <code>encodeWav</code> writes int16 only, so choosing 24-bit currently changes nothing about the output. It is listed as a known gap in the README rather than quietly removed, because the fix is small and someone may want it.</p>
+
+    <h2>Does the microphone work in every browser?</h2>
+    <p>Capture needs <code>getUserMedia</code> in a secure context. Loopback and <code>localhost</code> qualify; a LAN address over plain HTTP does not, so on another device serve over TLS or use the demo. Safari's <code>MediaRecorder</code> support is the thinnest of the three engines, which is what the <code>ScriptProcessorNode</code> fallback exists for.</p>
+    <p>On iOS the tab can be suspended mid-take by the system. The take survives if the page is not reloaded, but a long session is better on a desktop.</p>
+
+    <h2>Can I use the output commercially?</h2>
+    <p>Yes. MIT covers the code and the rendered audio is yours; there is no attribution requirement in the licence and no royalty. Credit is welcome and not required.</p>
+
+    <h2>Why is there no build step?</h2>
+    <p>So that what runs is what you can read. There is no transpile, no minify and no generated bundle — open <code>js/tune.js</code> in a text editor and it is the file the browser executed. It also means the folder runs from any static host, and that a fork stays reviewable.</p>
+    <p>The cost is no TypeScript and no tree shaking. At this size neither is missed.</p>
+
+    <h2>How do I contribute?</h2>
+    <p>Read <code>CONTRIBUTING.md</code>. Short version: run <code>node scripts/test.mjs</code> before and after, keep new modules pure and covered by a self-test, and do not add a dependency without saying why in the pull request. Bug reports with the exact steps and the console text are more useful than a feature request.</p>
+
+    <h2>What is definitely missing?</h2>
+    <p>Undo across panel operations, real stereo take handling, marker and region editing, MIDI import, and any form of separation that deserves the name. The README keeps a live list of gaps; it is not a roadmap with dates.</p>
+
+    <p class="next"><a href="getting-started.html">Start using it</a><a href="../CONTRIBUTING.md">Contributing</a></p>
+  </main>
+</div>
+</body>
+</html>

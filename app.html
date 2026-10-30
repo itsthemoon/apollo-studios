@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Studio</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="bar">
+  <div class="brand"><span class="dot"></span> Voice Studio</div>
+  <div class="bar-actions">
+    <button id="btn-demo" class="ghost" type="button">Load demo</button>
+    <button id="btn-save" class="ghost" type="button">Save project</button>
+    <label class="ghost file">Open project<input id="file-project" type="file" accept=".json,application/json" hidden></label>
+  </div>
+</header>
+
+<main>
+  <section class="panel transport">
+    <div class="row">
+      <button id="btn-record" class="rec" type="button"><span class="rec-dot"></span>Record</button>
+      <button id="btn-play" class="ghost" type="button" disabled>Play</button>
+      <button id="btn-stop" class="ghost" type="button" disabled>Stop</button>
+      <span id="rec-timer" class="timer">0.0s</span>
+      <span id="mic-state" class="hint">mic idle</span>
+    </div>
+    <div class="row">
+      <label>BPM <input id="in-bpm" type="number" min="40" max="220" value="96" step="1"></label>
+      <label>Root <select id="in-root"></select></label>
+      <label>Scale <select id="in-scale"></select></label>
+      <label>Snap <input id="in-snap" type="range" min="0" max="100" value="100"><output id="out-snap">100%</output></label>
+      <label class="check"><input id="in-quantize" type="checkbox"> Quantize grid</label>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Take</h2>
+      <span id="note-count" class="hint">no notes</span>
+    </div>
+    <canvas id="wave" width="1200" height="120"></canvas>
+    <div id="note-list" class="notes"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Presets</h2>
+      <div class="row tight">
+        <label class="ghost file">Import<input id="file-preset" type="file" accept=".json,application/json" hidden></label>
+        <button id="btn-export-preset" class="ghost" type="button">Export</button>
+      </div>
+    </div>
+    <div id="preset-list" class="presets"></div>
+    <p id="preset-state" class="hint">factory patches</p>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Master</h2>
+      <button id="btn-analyze" class="ghost" type="button">Analyze</button>
+    </div>
+    <div id="eq-bands" class="eq"></div>
+    <div class="row">
+      <label>Threshold <input id="in-thresh" type="range" min="-60" max="0" value="-18"><output id="out-thresh">-18 dB</output></label>
+      <label>Ratio <input id="in-ratio" type="range" min="1" max="12" value="3" step="0.5"><output id="out-ratio">3:1</output></label>
+      <label>Ceiling <input id="in-ceiling" type="range" min="-6" max="0" value="-1" step="0.1"><output id="out-ceiling">-1 dB</output></label>
+      <label>Target <input id="in-target" type="range" min="-24" max="-8" value="-14"><output id="out-target">-14 dB</output></label>
+      <label>Vocal <input id="in-gain" type="range" min="-12" max="12" value="0"><output id="out-gain">0 dB</output></label>
+    </div>
+    <dl id="meter" class="meter">
+      <dt>peak</dt><dd id="meter-peak">--</dd>
+      <dt>loudness</dt><dd id="meter-rms">--</dd>
+      <dt>gain</dt><dd id="meter-gain">--</dd>
+    </dl>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>Export</h2></div>
+    <div class="row">
+      <label>Rate <select id="in-rate">
+        <option value="44100">44.1 kHz</option>
+        <option value="48000" selected>48 kHz</option>
+      </select></label>
+      <label>Bit depth <select id="in-bits"><option value="16" selected>16-bit</option><option value="24">24-bit</option></select></label>
+      <button id="btn-export" class="primary" type="button">Export WAV</button>
+    </div>
+    <pre id="log" class="log" aria-live="polite"></pre>
+  </section>
+</main>
+
+<footer class="foot"><span id="status">ready</span></footer>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

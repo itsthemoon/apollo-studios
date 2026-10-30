@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Architecture — Undertow</title>
+<meta name="description" content="The module map, the purity rule, and the test harness that makes a dependency-free audio app trustworthy.">
+<link rel="stylesheet" href="../styles-landing.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="mark" href="../index.html"><span class="pip"></span>Undertow</a>
+    <nav aria-label="Primary">
+      <a href="architecture.html" aria-current="page">Docs</a>
+      <a href="../app.html">Studio</a>
+    </nav>
+  </div>
+</header>
+
+<div class="doc">
+  <aside class="side">
+    <p>Documentation</p>
+    <ul>
+      <li><a href="../index.html">Overview</a></li>
+      <li><a href="getting-started.html">Getting started</a></li>
+      <li><a href="features.html">Features</a></li>
+      <li><a href="architecture.html" aria-current="page">Architecture</a></li>
+      <li><a href="faq.html">FAQ</a></li>
+    </ul>
+    <p>Project</p>
+    <ul>
+      <li><a href="../app.html">Open the studio</a></li>
+      <li><a href="../CONTRIBUTING.md">Contributing</a></li>
+    </ul>
+  </aside>
+
+  <main id="main" class="prose">
+    <h1>Architecture</h1>
+    <p class="standfirst">A static site with a pure DSP core. The interesting decisions are about where the browser is allowed to appear and how audio gets asserted without a microphone.</p>
+
+    <h2>Shape of the thing</h2>
+    <p>There is no framework, no bundler and no runtime dependency. <code>package.json</code> exists only so <code>npm run serve</code> and <code>npm test</code> are available and so Node treats the folder as ESM; nothing is installed. The delivered artifact is the folder itself.</p>
+    <p>That constraint is the whole architecture. Every piece of audio work is a plain function in its own module under <code>js/</code>, taking buffers and returning buffers. The browser appears in exactly two files:</p>
+    <ul>
+      <li><code>js/capture.js</code> — <code>getUserMedia</code>, <code>MediaRecorder</code>, and a <code>ScriptProcessorNode</code> fallback for capture.</li>
+      <li><code>js/app.js</code> — the only DOM layer, owning ids, project state, playback through one <code>AudioContext</code>, and the export flow.</li>
+    </ul>
+    <p>No module under <code>js/</code> imports from <code>app.js</code>. The direction is always page to module, never sideways into the UI.</p>
+
+    <h2>Module map</h2>
+    <table>
+      <tr><th>Module</th><th>Responsibility</th></tr>
+      <tr><td><code>pitch.js</code></td><td>Normalized autocorrelation per frame, 70–1000 Hz, clarity returned alongside the estimate; 50-cent note merging.</td></tr>
+      <tr><td><code>tune.js</code></td><td>12-TET conversion, scale tables, nearest legal pitch, strength-weighted snap, grid quantize, per-sample speed curve.</td></tr>
+      <tr><td><code>harmony.js</code></td><td>Interval presets, transposition, stacked parts with gain and spread.</td></tr>
+      <tr><td><code>voicechar.js</code></td><td>Resample, treble shelf, soft drive, breath mix.</td></tr>
+      <tr><td><code>stems.js</code></td><td>Frame-median harmonic and percussive split, exact recombination.</td></tr>
+      <tr><td><code>beat.js</code></td><td>Genre tables and synthesized kick, snare and hat rendering.</td></tr>
+      <tr><td><code>compose.js</code></td><td>Seeded PRNG, melody walk, triad stacking.</td></tr>
+      <tr><td><code>automix.js</code></td><td>Genre-derived master suggestion, level balancing, instrument previews.</td></tr>
+      <tr><td><code>master.js</code></td><td>RBJ biquads, EQ, compressor, RMS normalization, lookahead limiter, chained render and true metering.</td></tr>
+      <tr><td><code>wav.js</code></td><td>RIFF header and int16 interleave.</td></tr>
+    </table>
+    <p><code>js/contract.md</code> and <code>js/contract-appendix.md</code> are the written interfaces these were built against, including the parameter ranges the tests rely on. They are checked in, so a change to a signature is visible in the diff rather than in a runtime surprise.</p>
+
+    <h2>The purity rule</h2>
+    <p>Modules must import and run under bare Node with no shims. Browser globals are legal only inside functions, never at import time, so a test can load any module without a DOM stub.</p>
+    <p>Functions return their results and never mutate an input buffer in place, with two named exceptions whose prefixes say so: <code>applyEQ</code>, <code>compress</code>, <code>limit</code> and <code>normalizeRms</code> may return fresh buffers but must not alias the input. Numbers stay finite; divide-by-zero is guarded and silence returns a zero pitch rather than <code>NaN</code>.</p>
+    <p>Sample rate is a parameter everywhere. Nothing assumes 44.1 kHz, which is why the default is 48 and why a project carries its rate with it.</p>
+
+    <h2>Testing audio without a room</h2>
+    <p>The suite builds a 2.4 second synthetic phrase: four syllables at known MIDI pitches with a shaped envelope and a little noise. It then asserts the pipeline end to end — four notes detected, each within two semitones and 120 ms of its source, every note landing in key after a full snap, the input array unchanged by the snap, the WAV header byte-correct, every output sample finite, no sample above 0 dBFS.</p>
+    <p>Preferences would make a weak suite. The phrase is deterministic, so the assertions are equalities and ranges rather than vibes. Each module also carries a self-test that the suite spawns and requires to print <code>ALL CHECKS PASSED</code>; a module can be verified on its own in one command.</p>
+    <p>What this does not cover: a real microphone, and playback scheduling. Both are listed as gaps rather than pretended away.</p>
+
+    <h2>Serving</h2>
+    <p><code>scripts/serve.mjs</code> is forty lines of <code>node:http</code>: path normalization, MIME by extension, <code>no-store</code>, a 403 for anything that escapes the root. Loopback only. It exists for the tests and for people who do not want to look up a Python one-liner, not because the app needs a backend.</p>
+    <p>The CI job runs the same server, so the served-site checks are exercised on every push rather than only on a laptop.</p>
+
+    <h2>Failure modes worth knowing</h2>
+    <ul>
+      <li><code>file://</code> breaks module loading. The folder must be served.</li>
+      <li>A microphone on a non-secure origin is refused by the browser; loopback counts as secure.</li>
+      <li>The compressor and limiter are sample loops in JS. A five minute take is slow to render, and the UI stays synchronous while it does.</li>
+      <li>Everything is mono until the master stage, which duplicates the channel. True stereo take handling does not exist yet.</li>
+    </ul>
+
+    <p class="next"><a href="faq.html">Next: questions, answered plainly</a><a href="getting-started.html">Getting started</a></p>
+  </main>
+</div>
+</body>
+</html>

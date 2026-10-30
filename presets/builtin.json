@@ -1,0 +1,302 @@
+[
+  {
+    "version": 1,
+    "name": "Clean Vocal",
+    "tune": {
+      "root": 0,
+      "scale": "chromatic",
+      "amount": 0.35
+    },
+    "master": {
+      "eq": [
+        {
+          "kind": "highpass",
+          "freq": 80,
+          "q": 0.71,
+          "gainDb": 0
+        },
+        {
+          "kind": "peaking",
+          "freq": 240,
+          "q": 1,
+          "gainDb": -2
+        },
+        {
+          "kind": "peaking",
+          "freq": 3200,
+          "q": 1.2,
+          "gainDb": 1.5
+        },
+        {
+          "kind": "highshelf",
+          "freq": 8000,
+          "q": 0.71,
+          "gainDb": 1.5
+        }
+      ],
+      "comp": {
+        "thresholdDb": -20,
+        "ratio": 2,
+        "attackMs": 12,
+        "releaseMs": 140,
+        "makeupDb": 0
+      },
+      "limitDb": -1,
+      "targetRmsDb": -16
+    },
+    "vocal": {
+      "gainDb": 0,
+      "reverbMix": 0.1
+    }
+  },
+  {
+    "version": 1,
+    "name": "Radio Pop",
+    "tune": {
+      "root": 0,
+      "scale": "major",
+      "amount": 0.85
+    },
+    "master": {
+      "eq": [
+        {
+          "kind": "highpass",
+          "freq": 90,
+          "q": 0.71,
+          "gainDb": 0
+        },
+        {
+          "kind": "peaking",
+          "freq": 300,
+          "q": 1,
+          "gainDb": -2.5
+        },
+        {
+          "kind": "peaking",
+          "freq": 2500,
+          "q": 1,
+          "gainDb": 3
+        },
+        {
+          "kind": "highshelf",
+          "freq": 9000,
+          "q": 0.71,
+          "gainDb": 2.5
+        }
+      ],
+      "comp": {
+        "thresholdDb": -24,
+        "ratio": 3,
+        "attackMs": 8,
+        "releaseMs": 100,
+        "makeupDb": 2
+      },
+      "limitDb": -0.5,
+      "targetRmsDb": -11
+    },
+    "vocal": {
+      "gainDb": 1,
+      "reverbMix": 0.15
+    }
+  },
+  {
+    "version": 1,
+    "name": "Warm Ballad",
+    "tune": {
+      "root": 9,
+      "scale": "minor",
+      "amount": 0.6
+    },
+    "master": {
+      "eq": [
+        {
+          "kind": "highpass",
+          "freq": 60,
+          "q": 0.71,
+          "gainDb": 0
+        },
+        {
+          "kind": "lowshelf",
+          "freq": 120,
+          "q": 0.71,
+          "gainDb": 1.5
+        },
+        {
+          "kind": "peaking",
+          "freq": 400,
+          "q": 0.8,
+          "gainDb": -1
+        },
+        {
+          "kind": "peaking",
+          "freq": 7000,
+          "q": 1,
+          "gainDb": -1.5
+        }
+      ],
+      "comp": {
+        "thresholdDb": -18,
+        "ratio": 2.5,
+        "attackMs": 20,
+        "releaseMs": 250,
+        "makeupDb": 1
+      },
+      "limitDb": -1.5,
+      "targetRmsDb": -18
+    },
+    "vocal": {
+      "gainDb": 0.5,
+      "reverbMix": 0.3
+    }
+  },
+  {
+    "version": 1,
+    "name": "Hard Tune",
+    "tune": {
+      "root": 0,
+      "scale": "chromatic",
+      "amount": 1
+    },
+    "master": {
+      "eq": [
+        {
+          "kind": "highpass",
+          "freq": 100,
+          "q": 0.71,
+          "gainDb": 0
+        },
+        {
+          "kind": "peaking",
+          "freq": 200,
+          "q": 1,
+          "gainDb": -3
+        },
+        {
+          "kind": "peaking",
+          "freq": 3000,
+          "q": 1,
+          "gainDb": 4
+        },
+        {
+          "kind": "peaking",
+          "freq": 6000,
+          "q": 1.4,
+          "gainDb": 2
+        },
+        {
+          "kind": "highshelf",
+          "freq": 10000,
+          "q": 0.71,
+          "gainDb": 3
+        }
+      ],
+      "comp": {
+        "thresholdDb": -26,
+        "ratio": 4,
+        "attackMs": 5,
+        "releaseMs": 80,
+        "makeupDb": 3
+      },
+      "limitDb": -0.3,
+      "targetRmsDb": -10
+    },
+    "vocal": {
+      "gainDb": 0,
+      "reverbMix": 0.08
+    }
+  },
+  {
+    "version": 1,
+    "name": "Spoken Word",
+    "tune": {
+      "root": 0,
+      "scale": "chromatic",
+      "amount": 0
+    },
+    "master": {
+      "eq": [
+        {
+          "kind": "highpass",
+          "freq": 70,
+          "q": 0.71,
+          "gainDb": 0
+        },
+        {
+          "kind": "peaking",
+          "freq": 150,
+          "q": 1,
+          "gainDb": -1.5
+        },
+        {
+          "kind": "peaking",
+          "freq": 1500,
+          "q": 0.9,
+          "gainDb": 2
+        },
+        {
+          "kind": "highshelf",
+          "freq": 7000,
+          "q": 0.71,
+          "gainDb": 1
+        }
+      ],
+      "comp": {
+        "thresholdDb": -16,
+        "ratio": 2.5,
+        "attackMs": 6,
+        "releaseMs": 200,
+        "makeupDb": 0
+      },
+      "limitDb": -1,
+      "targetRmsDb": -16
+    },
+    "vocal": {
+      "gainDb": 0,
+      "reverbMix": 0.05
+    }
+  },
+  {
+    "version": 1,
+    "name": "Room Demo",
+    "tune": {
+      "root": 7,
+      "scale": "pentatonicMinor",
+      "amount": 0.45
+    },
+    "master": {
+      "eq": [
+        {
+          "kind": "highpass",
+          "freq": 85,
+          "q": 0.71,
+          "gainDb": 0
+        },
+        {
+          "kind": "peaking",
+          "freq": 300,
+          "q": 1,
+          "gainDb": -1.5
+        },
+        {
+          "kind": "peaking",
+          "freq": 4500,
+          "q": 1.1,
+          "gainDb": 1.5
+        }
+      ],
+      "comp": {
+        "thresholdDb": -15,
+        "ratio": 2,
+        "attackMs": 15,
+        "releaseMs": 180,
+        "makeupDb": 0
+      },
+      "limitDb": -1,
+      "targetRmsDb": -14
+    },
+    "vocal": {
+      "gainDb": 0,
+      "reverbMix": 0.2
+    }
+  }
+]

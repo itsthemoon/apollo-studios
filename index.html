@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Undertow — a vocal studio that runs in your browser</title>
+<meta name="description" content="Undertow is an open-source, local-only vocal studio. Sing a take, tune it, shape it, export a WAV. No account, no upload.">
+<link rel="stylesheet" href="styles-landing.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="mark" href="index.html"><span class="pip"></span>Undertow</a>
+    <nav aria-label="Primary">
+      <a href="docs/getting-started.html">Getting started</a>
+      <a href="docs/features.html">Features</a>
+      <a href="docs/architecture.html">Architecture</a>
+      <a href="docs/faq.html">FAQ</a>
+      <a href="app.html">Studio</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+  <div class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Open source · MIT · local-only</p>
+      <h1>Undertow</h1>
+      <p class="line">Sing it. Shape it. Ship it.</p>
+      <p class="sub">
+        A vocal studio that is a folder of static files: pitch detection, tuning, harmonies, a
+        mastering chain and a WAV encoder, all running on your own machine. Nothing is uploaded,
+        nothing needs an account, and there is no build step to trust.
+      </p>
+      <div class="cta">
+        <a class="btn primary" href="app.html">Open the studio</a>
+        <a class="btn" href="docs/getting-started.html">Read the setup</a>
+        <span class="note">Runs offline once served.</span>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <h2>What is in the box</h2>
+      <p class="lead">Twelve tools, all plain JavaScript over <code>Float32Array</code>. Every one is unit tested under Node before it ever reaches the UI.</p>
+      <div class="grid">
+        <article class="card"><span class="idx">01</span><h3>Autotune</h3><p>Snaps a take to a key in cents, with a strength dial so you can leave some vibrato alone.</p></article>
+        <article class="card"><span class="idx">02</span><h3>Harmonies</h3><p>Stacks up to three intervals from the notes you actually sang, each with its own level and spread.</p></article>
+        <article class="card"><span class="idx">03</span><h3>Voice characters</h3><p>Resample, tilt the treble, add soft drive and breath to push a voice somewhere else entirely.</p></article>
+        <article class="card"><span class="idx">04</span><h3>Stem split</h3><p>A frame-median harmonic and percussive split. Crude by design, and it recombines sample-exactly.</p></article>
+        <article class="card"><span class="idx">05</span><h3>Beat generator</h3><p>Synthesized kick, snare and hats rendered from a genre and a bar count. Same input, same beat.</p></article>
+        <article class="card"><span class="idx">06</span><h3>Melody generator</h3><p>A seeded walk through the scale, one or two steps at a time, so an idea is reproducible.</p></article>
+        <article class="card"><span class="idx">07</span><h3>Chord generator</h3><p>Triads stacked from scale degrees, one per bar, to hum against while the take is still rough.</p></article>
+        <article class="card"><span class="idx">08</span><h3>Automix</h3><p>Suggests EQ and compression from the genre, and level trims that pull a stack of tracks together.</p></article>
+        <article class="card"><span class="idx">09</span><h3>Mastering chain</h3><p>EQ into a compressor into loudness targeting into a limiter, then meters the true post-chain peak.</p></article>
+        <article class="card"><span class="idx">10</span><h3>Presets</h3><p>Versioned JSON patches with range validation, import and export. A broken file is rejected, not half-applied.</p></article>
+        <article class="card"><span class="idx">11</span><h3>WAV export</h3><p>16-bit stereo PCM at 44.1 or 48 kHz, assembled byte by byte in the page and handed to the download shelf.</p></article>
+        <article class="card"><span class="idx">12</span><h3>Project save</h3><p>The take, the notes and the patch settings in one JSON file you can reopen later or move to another machine.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>How it works</h2>
+      <p class="lead">Three steps, no wizard, no upload progress bar.</p>
+      <div class="steps">
+        <article class="step"><h3>Sing it</h3><p>Hit record and sing a phrase. Undertow tracks the pitch per frame and turns the take into editable notes you can drag, retune or delete.</p></article>
+        <article class="step"><h3>Shape it</h3><p>Snap to a key, stack harmonies, pick a character, drop a beat under it, then let the master chain find the ceiling.</p></article>
+        <article class="step"><h3>Ship it</h3><p>Export a WAV. Save the project if you want it back. The file is yours and the audio never left the machine.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Why local-only</h2>
+      <ul class="facts">
+        <li><b>No account</b>There is no sign-up, no session, no dashboard holding your stems.</li>
+        <li><b>No upload</b>Capture, tuning and rendering all happen in the tab, on the CPU you already own.</li>
+        <li><b>No dependencies</b>The whole studio is static files. Serve the folder and it works offline.</li>
+      </ul>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-in">
+    <nav aria-label="Footer">
+      <a href="app.html">Studio</a>
+      <a href="docs/getting-started.html">Getting started</a>
+      <a href="docs/features.html">Features</a>
+      <a href="docs/architecture.html">Architecture</a>
+      <a href="docs/faq.html">FAQ</a>
+      <a href="CONTRIBUTING.md">Contributing</a>
+    </nav>
+    <div class="rule">
+      <p>MIT licensed. Copyright 2026 Jackson Davis. Take it, fork it, sell what you make with it.</p>
+      <p>An independent project. Not affiliated with BandLab, Ableton, or any other DAW vendor, and carrying none of their code or preset data.</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

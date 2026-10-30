@@ -1,0 +1,15 @@
+{
+  "name": "undertow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Open-source browser vocal studio: record, tune, master, export. Runs entirely on your machine.",
+  "type": "module",
+  "scripts": {
+    "serve": "node scripts/serve.mjs",
+    "test": "node scripts/test.mjs",
+    "e2e": "node scripts/e2e.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
