@@ -94,7 +94,8 @@
 .strip { flex: 0 0 52px; display: flex; flex-direction: column; align-items: center; gap: 6px;
   background: #121216; border: 1px solid #1f1f24; border-radius: 8px; padding: 8px 6px; }
 .strip b { font-size: 9.5px; font-weight: 600; writing-mode: vertical-rl; max-height: 74px; overflow: hidden; text-overflow: ellipsis; }
-.strip input[type="range"] { writing-mode: vertical-lr; direction: rtl; height: 96px; width: 18px; accent-color: var(--cyan); }
+.strip > input[type="range"] { writing-mode: vertical-lr; direction: rtl; height: 52px; width: 18px; accent-color: var(--cyan); }
+.strip .sendknob input[type="range"], .strip > input.strippan { writing-mode: horizontal-tb; direction: ltr; height: 13px; width: 100%; accent-color: var(--cyan); }
 .strip .db { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
 .strip .mstag { display: flex; gap: 3px; }
 .strip.master { border-color: #3a4a55; }
@@ -289,3 +290,56 @@
 #p-take { display: flex; flex-direction: column; height: 100%; }
 #p-take .roll-wrap { flex: 1 1 auto; min-height: 96px; }
 #p-take #roll { height: 100%; }
+
+/* ------------------------------------------------------- transport additions */
+/* count-in badge: a red beat count that sits where the clock does */
+.count-in { font-family: var(--mono); font-size: 15px; font-weight: 700; color: var(--red-hot);
+  min-width: 22px; text-align: center; letter-spacing: 0.04em; }
+.count-in[hidden] { display: none; }
+body.counting #btn-record { box-shadow: 0 0 0 2px var(--red-hot); }
+body.counting .rec-dot { animation: none; }
+#btn-metro.on { color: var(--cyan); background: rgba(0, 198, 209, 0.14); }
+#btn-metro[aria-pressed="true"] { color: var(--cyan); }
+
+.zoomsel { display: inline-flex; align-items: center; }
+.zoomsel input { width: 66px; height: 22px; accent-color: var(--cyan); }
+.ruler-tools .zoomsel { padding: 0 2px; }
+
+.menu-range { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: var(--ink); }
+.menu-range input { flex: 1; accent-color: var(--cyan); }
+.menu-range output { font-family: var(--mono); font-size: 10.5px; color: var(--dim); min-width: 30px; text-align: right; }
+
+/* ------------------------------------------------------------- mixer extras */
+.mixer { flex: 0 0 214px; }
+.strips { flex: 1 1 auto; overflow: auto; align-items: flex-start; }
+.strip { flex: 0 0 62px; gap: 4px; }
+.strip b { max-height: 26px; }
+.strip .mlab { display: none; }
+.strip .db { font-size: 9px; line-height: 1; }
+.strip .mstag .ms { height: 16px; }
+.sends { display: flex; flex-direction: column; gap: 3px; width: 100%; align-items: center;
+  padding-bottom: 3px; border-bottom: 1px solid #1a1a1e; }
+.sendknob { display: grid; grid-template-columns: 9px 1fr; align-items: center; gap: 2px;
+  width: 100%; font-family: var(--mono); font-size: 8.5px; color: var(--dim); }
+.sendknob span { text-align: center; }
+.sendknob.on { color: var(--cyan); }
+.sendknob.on input { accent-color: var(--cyan); }
+.sendknob output { position: absolute; right: 0; top: 0; font-size: 6.5px; line-height: 1; color: var(--faint); }
+.sendknob { position: relative; }
+.sendknob.on output { color: var(--cyan); }
+.insert { width: 100%; height: 16px; border: 1px solid var(--line); border-radius: 4px;
+  background: transparent; color: var(--dim); font: 9px/1 var(--mono); padding: 0 2px; }
+.insert:hover { border-color: var(--cyan); color: var(--ink); }
+.insert.loaded { color: var(--cyan); border-color: #1d6a72; background: rgba(0, 198, 209, 0.08); }
+.strip-meter { display: block; width: 100%; height: 5px; border-radius: 2px; background: #1b1b20; overflow: hidden; }
+.strip-meter i { display: block; width: 0; height: 100%; background: #63c07f; transition: width 60ms linear; }
+.strip-meter i[data-zone="warn"] { background: var(--gold); }
+.strip-meter i[data-zone="clip"] { background: var(--red-hot); }
+.master-meter { height: 7px; margin-top: 2px; }
+.master-read { display: flex; flex-direction: row; gap: 3px; font-family: var(--mono);
+  font-size: 7.5px; color: var(--dim); text-align: center; white-space: nowrap; }
+.master-read output { color: var(--text); }
+.master-read .gr output { color: var(--gold); }
+.strip.master { flex: 0 0 84px; }
+.strip.master b { max-height: 64px; }
+.strip.master > input[type="range"] { height: 64px; }

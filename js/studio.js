@@ -34,7 +34,19 @@ export function attach(app) {
   state.autoArm = false
   state.follow = true
   state.loop = null
+  state.metronome = false
+  state.metroLevel = 0.6
+  state.metroAccent = true
+  state.countIn = Number($('in-countin')?.value) || 0
+  state.snapBeats = 1
+  state.zoom = 77
   state.stretch = false
+  /* transport clock: one object so the meter engine can read it before the
+     transport section below has added its listeners */
+  const transport = {
+    playing: false, ctx: null, gain: null, timer: 0, raf: 0, sources: [],
+    from: 0, to: 0, t0: 0, len: 0, metroBeat: 0, counting: false,
+  }
   state.sound = null
   state.masterState = mastering2.createState()
   state.apState = autopitch.createState()
@@ -163,6 +175,7 @@ export function attach(app) {
       laneRows.append(row)
       if (t.type === 'instrument' && rollOf) renderRoll(row.querySelector('.mini-roll'), rollOf, { rows: 24, preview: true })
     })
+    laneSpan()
     renderMixer()
   }
 
@@ -205,7 +218,25 @@ export function attach(app) {
       el.closest('.vol-row').querySelector('[data-vol-read]').textContent = `${t.volumeDb.toFixed(1)} dB`
       renderMixer()
     }
-    if (el.dataset.pan) tracks.setPan(findTrack(el.dataset.pan), Number(el.value) / 100)
+    if (el.dataset.pan) {
+      const t = findTrack(el.dataset.pan)
+      if (!t) return
+      tracks.setPan(t, Number(el.value) / 100)
+      const read = document.querySelector(`[data-pan-read="${t.id}"]`)
+      if (read) read.textContent = panReadout(t.pan)
+    }
+    if (el.dataset.send) {
+      const [id, key] = el.dataset.send.split(':')
+      const t = findTrack(id)
+      if (!t) return
+      tracks.setSend(t, key, Number(el.value) / 100)
+      const knob = el.closest('.sendknob')
+      if (knob) {
+        knob.classList.toggle('on', t.sends[key] > 0)
+        const out = knob.querySelector('output')
+        if (out) out.textContent = sendReadout(t.sends[key])
+      }
+    }
   })
 
   document.addEventListener('click', (e) => {
@@ -343,6 +374,8 @@ export function attach(app) {
   })
 
   // ---------------------------------------------------------------- mixer
+  function sendReadout(v) { return v > 0 ? `${Math.round(v * 100)}%` : '–' }
+  function panReadout(p) { return p === 0 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}` }
   function renderMixer() {
     const host = $('strips')
     if (!host) return
@@ -352,21 +385,40 @@ export function attach(app) {
       const s = document.createElement('div')
       s.className = `strip${audible.has(t.id) ? '' : ' off'}`
       s.dataset.strip = t.id
-      s.innerHTML = `<b>${t.name}</b>
-        <input type="range" min="-60" max="6" value="${t.volumeDb}" step="0.5" aria-label="${t.name} fader" data-vol="${t.id}">
+      const inserts = t.chain?.effects.filter(e => e.slug !== fx.LIMITER_SLUG).length || 0
+      const reverb = t.sends?.reverb || 0
+      const delay = t.sends?.delay || 0
+      s.innerHTML = `<b>${escapeHtml(t.name)}</b>
+        <span class="sends">
+          <label class="sendknob${reverb ? ' on' : ''}" title="Send A — Reverb"><span>A</span>
+            <input type="range" min="0" max="100" step="1" value="${Math.round(reverb * 100)}" aria-label="${escapeHtml(t.name)} send A reverb" data-send="${t.id}:reverb">
+            <output>${sendReadout(reverb)}</output></label>
+          <label class="sendknob${delay ? ' on' : ''}" title="Send B — Delay"><span>B</span>
+            <input type="range" min="0" max="100" step="1" value="${Math.round(delay * 100)}" aria-label="${escapeHtml(t.name)} send B delay" data-send="${t.id}:delay">
+            <output>${sendReadout(delay)}</output></label>
+        </span>
+        <button class="insert${inserts ? ' loaded' : ''}" type="button" data-insert="${t.id}"
+          aria-label="${escapeHtml(t.name)} insert chain: ${inserts} ${inserts === 1 ? 'effect' : 'effects'}">fx ${inserts}</button>
+        <input type="range" min="-60" max="6" value="${t.volumeDb}" step="0.5" aria-label="${escapeHtml(t.name)} fader" data-vol="${t.id}">
         <span class="db">${t.volumeDb.toFixed(1)}</span>
+        <span class="mstag"><button class="ms" type="button" aria-label="Mute ${escapeHtml(t.name)}" data-mute="${t.id}" aria-pressed="${t.mute}">M</button>
+        <button class="ms" type="button" aria-label="Solo ${escapeHtml(t.name)}" data-solo="${t.id}" aria-pressed="${t.solo}">S</button></span>
         <span class="mlab">pan</span>
-        <input type="range" min="-100" max="100" value="${t.pan * 100}" aria-label="${t.name} pan" data-pan="${t.id}">
-        <span class="db">${t.pan === 0 ? 'C' : t.pan < 0 ? `L${Math.round(-t.pan * 100)}` : `R${Math.round(t.pan * 100)}`}</span>
-        <span class="mstag"><button class="ms" type="button" aria-label="Mute ${t.name}" data-mute="${t.id}" aria-pressed="${t.mute}">M</button>
-        <button class="ms" type="button" aria-label="Solo ${t.name}" data-solo="${t.id}" aria-pressed="${t.solo}">S</button></span>`
+        <input class="strippan" type="range" min="-100" max="100" value="${t.pan * 100}" aria-label="${escapeHtml(t.name)} pan — double-click to centre" title="Pan — double-click to centre" data-pan="${t.id}">
+        <span class="db" data-pan-read="${t.id}">${panReadout(t.pan)}</span>
+        <span class="strip-meter" data-meter="${t.id}" aria-hidden="true"><i></i></span>`
       host.append(s)
     })
     const m = document.createElement('div')
     m.className = 'strip master'
-    m.innerHTML = `<b>Master</b><input type="range" min="-12" max="12" value="${$('in-gain').value}" aria-label="Master fader"><span class="db">${$('out-gain').textContent}</span>`
+    m.innerHTML = `<b>Master</b>
+      <span class="master-read"><span class="tp">TP <output data-tp>–∞</output> dB</span>
+      <span class="gr">LIM <output data-gr>0.0</output> dB</span></span>
+      <input type="range" min="-12" max="12" value="${$('in-gain').value}" aria-label="Master fader"><span class="db">${$('out-gain').textContent}</span>
+      <span class="strip-meter master-meter" data-meter="master" aria-hidden="true"><i></i></span>`
     m.querySelector('input').addEventListener('input', (e) => { $('in-gain').value = e.target.value; $('in-gain').dispatchEvent(new Event('input')) })
     host.append(m)
+    paintMeters()
   }
   $('btn-mixer').addEventListener('click', () => {
     const m = $('mixer')
@@ -374,6 +426,123 @@ export function attach(app) {
     if (!m.hidden) renderMixer()
   })
   $('btn-mixer-close').addEventListener('click', () => { $('mixer').hidden = true })
+
+  // insert slot opens the chain browser for that strip's track
+  document.addEventListener('click', (e) => {
+    const ins = e.target.closest('[data-insert]')
+    if (!ins) return
+    state.fxTarget = ins.dataset.insert
+    state.active = ins.dataset.insert
+    document.querySelectorAll('.track-head').forEach(h => h.classList.toggle('on', h.dataset.track === state.active))
+    openModal('fx')
+  })
+
+  // double-click a pan knob (strip or track head) to put it back in the centre
+  document.addEventListener('dblclick', (e) => {
+    const knob = e.target.closest('[data-pan]')
+    if (!knob) return
+    const t = findTrack(knob.dataset.pan)
+    if (!t) return
+    e.preventDefault()
+    tracks.setPan(t, 0)
+    document.querySelectorAll(`[data-pan="${t.id}"]`).forEach((el) => { el.value = '0' })
+    const read = document.querySelector(`[data-pan-read="${t.id}"]`)
+    if (read) read.textContent = 'C'
+    app.log(`pan recentred: ${t.name}`)
+  })
+
+  // --- meters: one analyser taps whatever is playing, each strip scales it ---
+  let analyser = null
+  let meterSink = null
+  let meterRaf = 0
+  const meterBuf = new Float32Array(1024)
+  const dbToN = (db) => Math.min(1, Math.max(0, (db + 60) / 60))
+
+  function meterContext() { return transport.ctx || state.ctx }
+  function attachAnalyser() {
+    const ctx = meterContext()
+    if (!ctx) return null
+    if (analyser && analyser.context === ctx) {
+      // a fresh play() creates new sources; tap whichever ones aren't yet
+      state.playing.forEach(tapSource)
+      return analyser
+    }
+    try {
+      analyser = ctx.createAnalyser()
+      analyser.fftSize = 1024
+      analyser.smoothingTimeConstant = 0.55
+      meterSink = ctx.createGain()
+      meterSink.gain.value = 0
+      analyser.connect(meterSink).connect(ctx.destination)
+    } catch { analyser = null; return null }
+    state.playing.forEach(tapSource)
+    return analyser
+  }
+
+  function tapSource(src) { if (analyser && src) { try { src.connect(analyser) } catch { /* noop */ } } }
+
+  function paintMeters() {
+    if (!analyser || $('mixer')?.hidden) return
+    const buf = meterBuf
+    analyser.getFloatTimeDomainData(buf)
+    let peak = 0
+    let sum = 0
+    for (let i = 0; i < buf.length; i += 1) {
+      const v = Math.abs(buf[i])
+      if (v > peak) peak = v
+      sum += v * v
+    }
+    // true peak: sample the inter-sample curve at quarter steps
+    let tp = peak
+    for (let i = 0; i < buf.length - 1; i += 1) {
+      const a = buf[i]
+      const d = buf[i + 1] - a
+      for (let k = 1; k < 4; k += 1) {
+        const v = Math.abs(a + d * (k / 4))
+        if (v > tp) tp = v
+      }
+    }
+    const rmsN = dbToN(20 * Math.log10(Math.max(Math.sqrt(sum / buf.length), 1e-6)))
+    const audible = tracks.resolveSolo(state.tracks)
+    state.tracks.forEach((t) => {
+      const bar = document.querySelector(`[data-meter="${t.id}"] i`)
+      if (!bar) return
+      const factor = audible.has(t.id) ? 10 ** (t.volumeDb / 20) * (1 - Math.abs(t.pan) * 0.3) : 0
+      const n = Math.min(1, rmsN * factor)
+      bar.style.width = `${(n * 100).toFixed(1)}%`
+      bar.dataset.zone = n > 0.92 ? 'clip' : n > 0.72 ? 'warn' : 'ok'
+    })
+    const master = document.querySelector('[data-meter="master"] i')
+    if (master) {
+      const n = dbToN(20 * Math.log10(Math.max(tp, 1e-6)))
+      master.style.width = `${(n * 100).toFixed(1)}%`
+      master.dataset.zone = n > 0.97 ? 'clip' : n > 0.8 ? 'warn' : 'ok'
+      const tpOut = document.querySelector('[data-tp]')
+      if (tpOut) tpOut.textContent = tp > 1e-5 ? (20 * Math.log10(tp)).toFixed(1) : '–∞'
+      const ceiling = Number($('in-master-ceiling')?.value ?? -1)
+      const peakDb = 20 * Math.log10(Math.max(tp, 1e-6))
+      const gr = document.querySelector('[data-gr]')
+      if (gr) gr.textContent = Math.max(0, peakDb - ceiling).toFixed(1)
+    }
+  }
+
+  function meterLoop() {
+    meterRaf = 0
+    if (!state.playing.length && !transport.playing) {
+      document.querySelectorAll('[data-meter] i').forEach((b) => { b.style.width = '0%' })
+      const tpOut = document.querySelector('[data-tp]')
+      if (tpOut) tpOut.textContent = '–∞'
+      const gr = document.querySelector('[data-gr]')
+      if (gr) gr.textContent = '0.0'
+      return
+    }
+    paintMeters()
+    meterRaf = requestAnimationFrame(meterLoop)
+  }
+  function startMeter() {
+    attachAnalyser()
+    if (!meterRaf) meterRaf = requestAnimationFrame(meterLoop)
+  }
 
   // ---------------------------------------------------------------- roll editor
   const ROLL_W = 1400
@@ -963,32 +1132,424 @@ export function attach(app) {
     $('sound-player').hidden = true
   })
 
-  // ---------------------------------------------------------------- transport extras
-  $('btn-metro').setAttribute('aria-pressed', 'false')
+  // ---------------------------------------------------------------- snap grid
+  // Values are beats, so the division is the same unit the timeline drags use.
+  // A triplet is 2/3 or 1/3 of a beat; Off is 0 and returns the input untouched.
+  const GRID = [
+    ['4', '1/1'], ['2', '1/2'], ['1', '1/4'], ['0.5', '1/8'], ['0.25', '1/16'],
+    ['0.125', '1/32'], ['0.6666666667', '1/4T'], ['0.3333333333', '1/8T'], ['0', 'Off'],
+  ]
+  const gridSel = $('in-grid')
+  gridSel.innerHTML = GRID.map(([v, label]) => `<option value="${v}">${label}</option>`).join('')
+  gridSel.value = '1'
+  state.snapBeats = 1
+  gridSel.addEventListener('change', () => {
+    state.snapBeats = Number(gridSel.value) || 0
+    app.log(`snap grid: ${gridSel.selectedOptions[0]?.textContent || 'Off'}`)
+  })
+
+  const clamp01 = (v) => Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0))
+  /* Blend the raw position toward the division by the strength slider. Off (or
+     a zero strength) is the identity, so nothing is nudged. */
+  function snap(beats, strength = Number($('in-snap').value) / 100) {
+    const n = Number(beats)
+    if (!Number.isFinite(n)) return 0
+    const div = state.snapBeats
+    const amount = clamp01(strength)
+    if (!div || div <= 0 || amount <= 0) return n
+    return n + (Math.round(n / div) * div - n) * amount
+  }
+
+  const bpmNow = () => Number($('in-bpm').value) || 96
+  const barPx = () => {
+    const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar'))
+    return Number.isFinite(v) && v > 0 ? v : state.zoom
+  }
+  const pxPerBeat = () => barPx() / 4
+  const beatsOf = (px) => px / pxPerBeat()
+  const pxOf = (beats) => beats * pxPerBeat()
+  const playheadBeats = () => Math.max(0, state.playhead * bpmNow() / 60)
+
+  function placePlayhead(beats) {
+    state.playhead = Math.max(0, beats) * 60 / bpmNow()
+    const head = $('playhead')
+    if (head) head.style.left = `${pxOf(Math.max(0, beats))}px`
+  }
+  function snapPlayhead() { placePlayhead(snap(playheadBeats())) }
+  /* both edges of the loop band land on the grid together, so a ruled loop is
+     always whole beats (and Off leaves the drag exactly as drawn) */
+  function snapLoop() {
+    if (!state.loop) return
+    const pp = pxPerBeat()
+    const a = Math.max(0, snap(beatsOf(state.loop.from)) * pp)
+    const b = Math.max(0, snap(beatsOf(state.loop.to)) * pp)
+    state.loop = { from: Math.min(a, b), to: Math.max(a, b) }
+    paintLoop()
+  }
+
+
+  // the lane (app.js) and the ruler (timeline) both set the playhead; snap after
+  // they have run, and snap the loop band after every ruler drag
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.target.closest('#lane, #ruler')) return
+    snapPlayhead()
+  })
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#lane, #ruler')) return
+    snapPlayhead()
+    snapLoop()
+  })
+  document.addEventListener('pointerup', (e) => {
+    if (!e.target.closest('#ruler')) return
+    snapLoop()
+  })
+
+  // ---------------------------------------------------------------- zoom
+  const ZOOM_MIN = 24
+  const ZOOM_MAX = 220
+  const zoomIn = document.createElement('label')
+  zoomIn.className = 'zoomsel'
+  zoomIn.innerHTML = '<input id="in-zoom" type="range" min="24" max="220" step="1" value="77" aria-label="Timeline zoom">'
+  $('btn-zoom-out').before(zoomIn)
+  const zoomSlider = $('in-zoom')
+
+  function arrangementBars() {
+    let beats = 16
+    state.tracks.forEach((t) => {
+      [t.clip, ...(Array.isArray(t.clips) ? t.clips : [])].filter(Boolean).forEach((c) => {
+        beats = Math.max(beats, (c.startBeat || 0) + (c.lengthBeats || 0))
+      })
+    })
+    return Math.ceil(beats / 4) + 8
+  }
+
+  // the ruler re-derives its own bar count from the arrangement and the zoom
+  function rebuildRuler() {
+    const ruler = $('ruler')
+    if (!ruler) return 0
+    const lane = $('lane')
+    const bars = Math.max(24, arrangementBars(), Math.ceil((lane?.clientWidth || 0) / barPx()) + 2)
+    ruler.innerHTML = Array.from({ length: bars }, (_, i) => `<span class="bar${i === 0 ? ' on' : ''}">${i + 1}</span>`).join('')
+    const band = document.createElement('span')
+    band.className = 'loop-region'
+    band.id = 'loop-region'
+    band.hidden = true
+    ruler.append(band)
+    paintLoop()
+    return bars
+  }
+
+  // rows carry the zoomed length so the lane can scroll at all
+  function laneSpan() {
+    const bars = document.querySelectorAll('#ruler .bar').length || 24
+    const width = `${bars * barPx()}px`
+    const rows = $('lane-rows')
+    if (rows) rows.style.width = width
+    document.querySelectorAll('.lane-row').forEach((row) => { row.style.width = width })
+  }
+
+  function keepPlayheadInView() {
+    const lane = $('lane')
+    if (!lane) return
+    const x = pxOf(playheadBeats())
+    const margin = 24
+    if (x < lane.scrollLeft + margin || x > lane.scrollLeft + lane.clientWidth - margin) {
+      lane.scrollLeft = Math.max(0, x - lane.clientWidth / 2)
+    }
+    const row = $('ruler-row')
+    if (row) row.scrollLeft = lane.scrollLeft
+  }
+
+  function setZoom(value) {
+    const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(Number(value) || state.zoom)))
+    state.zoom = next
+    document.documentElement.style.setProperty('--bar', `${next}px`)
+    zoomSlider.value = String(next)
+    // clips with an explicit pixel width only repaint when their row signature
+    // changes, so clear it and nudge the observer timeline keeps on the rows
+    document.querySelectorAll('.lane-row').forEach((row) => { row.dataset.tlSig = '' })
+    const rows = $('lane-rows')
+    if (rows) rows.append(document.createComment('zoom'))
+    rebuildRuler()
+    // the lane is only scrollable if it is actually wider than the viewport:
+    // give the rows and their host the full zoomed length
+    laneSpan()
+    const head = $('playhead')
+    if (head) head.style.left = `${pxOf(playheadBeats())}px`
+    if (state.loop) paintLoop()
+    keepPlayheadInView()
+    return next
+  }
+  zoomSlider.value = String(state.zoom)
+  zoomSlider.addEventListener('input', (e) => setZoom(e.target.value))
+  $('btn-zoom-in').addEventListener('click', () => setZoom(state.zoom + 14))
+  $('btn-zoom-out').addEventListener('click', () => setZoom(state.zoom - 14))
+  document.addEventListener('keydown', (e) => {
+    if (!(e.metaKey || e.ctrlKey) || e.key === '0') return
+    if (e.key === '=' || e.key === '+') { e.preventDefault(); setZoom(state.zoom + 14) }
+    if (e.key === '-') { e.preventDefault(); setZoom(state.zoom - 14) }
+  })
+
+  // ---------------------------------------------------------------- metronome
+  let metroCtx = null
+  let countTimer = 0
+  function metroContext() {
+    if (!metroCtx || metroCtx.state === 'closed') metroCtx = new AudioContext()
+    if (metroCtx.state === 'suspended') metroCtx.resume().catch(() => {})
+    return metroCtx
+  }
+  /* a 1 kHz square blip with a 4 ms attack and a 45 ms tail — short enough to
+     sit under the take, loud enough to follow at 40 bpm */
+  function blip(at, accent) {
+    const ctx = metroCtx
+    if (!ctx) return
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'square'
+    osc.frequency.value = 1000
+    const peak = Math.max(0.0002, state.metroLevel * (accent ? 0.4 : 0.26))
+    gain.gain.setValueAtTime(0.0001, at)
+    gain.gain.exponentialRampToValueAtTime(peak, at + 0.004)
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.045)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(at)
+    osc.stop(at + 0.06)
+  }
+
+  function metroStart(fromBeat = 0) {
+    if (!state.metronome) return
+    const ctx = metroContext()
+    transport.metroBeat = fromBeat
+    let next = ctx.currentTime + 0.05
+    if (transport.timer) clearInterval(transport.timer)
+    const tick = () => {
+      const spb = 60 / bpmNow()
+      while (next < ctx.currentTime + 0.16) {
+        blip(next, state.metroAccent && transport.metroBeat % 4 === 0)
+        transport.metroBeat += 1
+        next += spb
+      }
+    }
+    tick()
+    transport.timer = setInterval(tick, 25)
+  }
+  function metroStop() {
+    if (transport.timer) clearInterval(transport.timer)
+    transport.timer = 0
+  }
+  function paintMetro() {
+    $('btn-metro').setAttribute('aria-pressed', String(state.metronome))
+    $('btn-metro').classList.toggle('on', state.metronome)
+  }
   $('btn-metro').addEventListener('click', () => {
     state.metronome = !state.metronome
-    $('btn-metro').setAttribute('aria-pressed', String(state.metronome))
-    if (state.metronome) startClick()
+    paintMetro()
+    if (state.metronome) {
+      metroContext()
+      if (transport.playing || state.ctx) metroStart(playheadBeats())
+    } else metroStop()
   })
-  let clickTimer = null
-  function startClick() {
-    stopClick()
-    const bpm = Number($('in-bpm').value)
-    const beatMs = 60000 / bpm
-    let beat = 0
-    clickTimer = setInterval(() => {
-      const ctx = new AudioContext()
-      const o = ctx.createOscillator()
-      const g = ctx.createGain()
-      o.frequency.value = beat % 4 === 0 ? 1600 : 1000
-      g.gain.value = 0.12
-      o.connect(g).connect(ctx.destination)
-      o.start(); o.stop(ctx.currentTime + 0.04)
-      beat++
-      setTimeout(() => ctx.close(), 200)
-    }, beatMs)
+  paintMetro()
+
+  // level lives in the metronome menu, which already had a volume row
+  const levelRow = document.createElement('label')
+  levelRow.className = 'menu-range'
+  levelRow.innerHTML = `<span>Click level</span><input id="in-metro-level" type="range" min="0" max="100" step="1" value="${Math.round(state.metroLevel * 100)}" aria-label="Metronome click level"><output id="out-metro-level">${Math.round(state.metroLevel * 100)}%</output>`
+  $('menu-metro').prepend(levelRow)
+  $('in-metro-level').addEventListener('input', (e) => {
+    state.metroLevel = Number(e.target.value) / 100
+    $('out-metro-level').textContent = `${e.target.value}%`
+    const row = $('menu-metro').querySelector('[data-metro="volume"]')
+    if (row) row.textContent = `Click volume: ${e.target.value}%`
+  })
+  $('menu-metro').addEventListener('click', (e) => {
+    const item = e.target.closest('[data-metro]')
+    if (!item) return
+    if (item.dataset.metro === 'count') {
+      state.countIn = (state.countIn + 1) % 3
+      $('in-countin').value = String(state.countIn)
+      $('metro-countin').textContent = state.countIn ? `${state.countIn} bar${state.countIn === 1 ? '' : 's'}` : 'off'
+    }
+    if (item.dataset.metro === 'accent') {
+      state.metroAccent = !state.metroAccent
+      item.textContent = `Accent bar 1: ${state.metroAccent ? 'on' : 'off'}`
+    }
+  })
+
+  // ---------------------------------------------------------------- count-in
+  const countBadge = document.createElement('span')
+  countBadge.id = 'count-in'
+  countBadge.className = 'count-in'
+  countBadge.hidden = true
+  countBadge.setAttribute('role', 'status')
+  countBadge.setAttribute('aria-live', 'assertive')
+  $('rec-timer').before(countBadge)
+
+  function countIn(bars, done) {
+    const ctx = metroContext()
+    const total = bars * 4
+    const spb = 60 / bpmNow()
+    const badge = $('count-in')
+    const first = ctx.currentTime + 0.1
+    let step = 0
+    transport.counting = true
+    document.body.classList.add('counting')
+    badge.hidden = false
+    const tick = () => {
+      if (step >= total) {
+        clearInterval(countTimer)
+        countTimer = 0
+        transport.counting = false
+        badge.hidden = true
+        document.body.classList.remove('counting')
+        done()
+        return
+      }
+      blip(first + step * spb, step % 4 === 0)
+      badge.textContent = String(total - step)
+      step += 1
+    }
+    tick()
+    countTimer = setInterval(tick, spb * 1000)
   }
-  function stopClick() { if (clickTimer) clearInterval(clickTimer); clickTimer = null }
+
+  // capture phase so the count-in can hold app.js's record handler back
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#btn-record')) return
+    if (state.countSkip) { state.countSkip = false; return }
+    if (state.rec) { metroStop(); return }
+    if (!state.countIn || transport.counting) {
+      if (state.metronome) setTimeout(() => metroStart(0), 120)
+      return
+    }
+    e.preventDefault()
+    e.stopPropagation()
+    countIn(state.countIn, () => {
+      state.countSkip = true
+      $('btn-record').click()
+      if (state.metronome) setTimeout(() => metroStart(0), 120)
+    })
+  }, true)
+
+  // ---------------------------------------------------------------- loop play
+  function loopBeats() {
+    if (!state.loop) return null
+    const from = Math.max(0, beatsOf(Math.min(state.loop.from, state.loop.to)))
+    const to = Math.max(0, beatsOf(Math.max(state.loop.from, state.loop.to)))
+    return to - from < 0.06 ? null : { from, to }
+  }
+
+  function scheduleCycle(ctx, buffer, gain, when) {
+    const spb = 60 / bpmNow()
+    const fromSec = transport.from * spb
+    const toSec = transport.to * spb
+    state.notes.forEach((note) => {
+      const start = note.start
+      const end = start + note.dur
+      if (end <= fromSec || start >= toSec) return
+      const skip = Math.max(0, fromSec - start)
+      const dur = Math.min(note.dur - skip, toSec - (start + skip))
+      if (dur <= 0.02) return
+      const shift = Number.isFinite(note.shift) ? note.shift : (Number(note.cents) || 0) / 100
+      const src = ctx.createBufferSource()
+      src.buffer = buffer
+      src.playbackRate.value = Math.pow(2, shift / 12)
+      src.connect(gain)
+      tapSource(src)
+      const at = when + Math.max(0, start - fromSec) * 1
+      src.start(at, start + skip, dur)
+      transport.sources.push(src)
+    })
+  }
+
+  function loopFrame() {
+    if (!transport.playing || !transport.ctx) return
+    const elapsed = Math.max(0, transport.ctx.currentTime - transport.t0)
+    const pos = transport.from * 60 / bpmNow() + (elapsed % transport.len)
+    state.playhead = pos
+    const head = $('playhead')
+    if (head) head.style.left = `${pxOf(pos * bpmNow() / 60)}px`
+    if (state.follow) keepPlayheadInView()
+    transport.raf = requestAnimationFrame(loopFrame)
+  }
+
+  function stopLoopPlay() {
+    if (!transport.playing) return
+    const ctx = transport.ctx
+    transport.playing = false
+    if (transport.timer) clearInterval(transport.timer)
+    transport.timer = 0
+    if (transport.raf) cancelAnimationFrame(transport.raf)
+    transport.raf = 0
+    transport.sources.forEach((src) => { try { src.stop() } catch { /* ended */ } })
+    transport.sources = []
+    ctx?.close()
+    transport.ctx = null
+    state.playing = state.playing.filter((src) => src.context !== ctx)
+    $('btn-play').disabled = !state.notes.length
+    $('btn-stop').disabled = true
+    metroStop()
+  }
+
+  function startLoopPlay(spec) {
+    stopLoopPlay()
+    const ctx = new AudioContext({ sampleRate: state.sampleRate })
+    ctx.resume?.().catch(() => {})
+    const spb = 60 / bpmNow()
+    transport.ctx = ctx
+    transport.from = spec.from
+    transport.to = spec.to
+    transport.len = (spec.to - spec.from) * spb
+    transport.t0 = ctx.currentTime + 0.08
+    transport.sources = []
+    transport.playing = true
+    const gain = ctx.createGain()
+    gain.gain.value = Math.pow(10, Number($('in-gain').value) / 20)
+    gain.connect(ctx.destination)
+    const buffer = ctx.createBuffer(1, state.take.length, state.sampleRate)
+    buffer.copyToChannel(state.take, 0)
+    placePlayhead(spec.from)
+    let cycle = transport.t0
+    const pump = () => {
+      while (cycle < ctx.currentTime + 0.4) {
+        scheduleCycle(ctx, buffer, gain, cycle)
+        cycle += transport.len
+      }
+    }
+    pump()
+    transport.timer = setInterval(pump, 60)
+    transport.raf = requestAnimationFrame(loopFrame)
+    $('btn-play').disabled = true
+    $('btn-stop').disabled = false
+    app.status(`looping ${spec.from.toFixed(2)}–${spec.to.toFixed(2)} beats`)
+    metroStart(spec.from)
+    startMeter()
+  }
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#btn-play')) return
+    const spec = loopBeats()
+    if (!spec || !state.notes.length) {
+      // app.js owns plain playback; let it start, then tap the sources for the
+      // meters once they exist
+      setTimeout(() => { attachAnalyser(); startMeter() }, 80)
+      return
+    }
+    e.preventDefault()
+    e.stopPropagation()
+    if (transport.playing) { stopLoopPlay(); app.status('stopped'); return }
+    startLoopPlay(spec)
+  }, true)
+
+  $('btn-stop').addEventListener('click', () => {
+    if (transport.playing) { stopLoopPlay(); placePlayhead(transport.from); return }
+    metroStop()
+  })
+  $('in-bpm').addEventListener('change', () => { if (transport.playing) { const spec = { from: transport.from, to: transport.to }; startLoopPlay(spec) } })
+  $('in-countin').addEventListener('change', (e) => {
+    state.countIn = Number(e.target.value)
+    $('metro-countin').textContent = state.countIn ? `${state.countIn} bar${state.countIn === 1 ? '' : 's'}` : 'off'
+  })
 
   $('btn-stretch').addEventListener('click', () => {
     state.stretch = !state.stretch
@@ -1022,7 +1583,6 @@ export function attach(app) {
     el.style.width = `${Math.max(4, state.loop.to - state.loop.from)}px`
   }
   $('in-follow').addEventListener('change', (e) => { state.follow = e.target.checked })
-  $('in-countin').addEventListener('change', (e) => { $('metro-countin').textContent = `${e.target.value} bar${e.target.value === '1' ? '' : 's'}` })
   $('in-master-ceiling').addEventListener('input', (e) => {
     $('out-master-ceiling').textContent = `${Number(e.target.value).toFixed(1)} dB`
     $('in-ceiling').value = e.target.value
@@ -1106,11 +1666,35 @@ export function attach(app) {
   paintMaster()
   renderChain(state.tracks[0])
   drawRoll()
+  setZoom(state.zoom)
+  paintLoop()
 
   return {
     state,
     renderAll() { renderTrackList(); syncAll(); drawRoll(); renderSounds(); renderVersions() },
     drawRoll,
+    snap,
+    grid: (value) => {
+      if (value !== undefined) { gridSel.value = String(value); gridSel.dispatchEvent(new Event('change')) }
+      return { value: gridSel.value, label: gridSel.selectedOptions[0]?.textContent, beats: state.snapBeats }
+    },
+    zoom: (value) => (value === undefined ? state.zoom : setZoom(value)),
+    metronome: (on) => {
+      if (on === undefined) return state.metronome
+      if (state.metronome !== !!on) $('btn-metro').click()
+      return state.metronome
+    },
+    metroLevel: (v) => {
+      if (v !== undefined) {
+        state.metroLevel = Math.min(1, Math.max(0, v))
+        $('in-metro-level').value = String(Math.round(state.metroLevel * 100))
+      }
+      return state.metroLevel
+    },
+    countIn: (bars) => {
+      if (bars !== undefined) { state.countIn = bars; $('in-countin').value = String(bars) }
+      return state.countIn
+    },
     addTrack: (type) => { const t = tracks.addTrack(state.tracks, { type, name: tracks.typeInfo(type).label }); if (tracks.typeInfo(type).midi) state.rolls.set(t.id, roll.createRoll()); if (type === 'drums') state.patterns.set(t.id, drums.createPattern()); renderTrackList(); return t.id },
     setActive(id) { state.active = id; renderChain(findTrack(id)); drawRoll() },
     chain: () => state.tracks.find(t => t.id === state.active)?.chain.effects,
@@ -1121,4 +1705,33 @@ export function attach(app) {
     versions: () => state.versions.length,
     shortcutsRendered: () => $('short-list').children.length,
   }
+}
+
+// ---------------------------------------------------------------- roll geometry
+// Appended so the renderer, `rollPoint` above and js/edit.js all share one
+// mapping. ROWS / the 26 px gutter / the 32-beat voice axis are the values
+// renderRoll and its pointer handler already use; keep them in step.
+export const ROLL_ROWS = 24
+export const ROLL_GUTTER = 26
+export const VOICE_BEATS = 32
+
+// Visible pitch window for the active track, mirroring renderRoll's `low`:
+// an instrument roll uses its own lowMidi, a voice track hangs under its
+// lowest note the way the read-only take view draws it.
+export function rollBounds(state) {
+  const r = state.rolls?.get(state.active)
+  if (r) return { low: r.lowMidi, rows: ROLL_ROWS, beats: r.lengthBeats }
+  const lowest = state.notes.length ? Math.min(...state.notes.map((n) => Math.floor(n.midi))) : 48
+  return { low: Math.max(24, Math.min(48, lowest - 2)), rows: ROLL_ROWS, beats: VOICE_BEATS }
+}
+
+// Pointer position -> { beat, midi } in the active roll, unclamped so a drag
+// keeps tracking past the edges. `midiF` is fractional for pitch drags, `row`
+// is the raw row index.
+export function rollPoint(state, box, clientX, clientY) {
+  const b = rollBounds(state)
+  const span = Math.max(1, box.width - ROLL_GUTTER)
+  const beat = ((clientX - box.left - ROLL_GUTTER) / span) * b.beats
+  const rowF = ((clientY - box.top) / Math.max(1, box.height)) * b.rows
+  return { beat, midiF: b.low + b.rows - 1 - rowF, midi: b.low + b.rows - 1 - Math.floor(rowF), row: Math.floor(rowF), ...b }
 }

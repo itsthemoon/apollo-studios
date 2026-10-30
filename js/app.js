@@ -15,6 +15,7 @@ import { attach as attachStudio } from './studio.js'
 import * as icons from './icons.js'
 import { install as installPanels } from './panels.js'
 import { install as installTimeline } from './timeline.js'
+import { install as installEdit } from './edit.js'
 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const DIVISION = 4
@@ -849,6 +850,7 @@ function boot() {
   state.studio = attachStudio(app)
   installPanels({ state, log })
   installTimeline({ state, log })
+  installEdit({ state, log })
   icons.hydrate()
   new MutationObserver((rows) => rows.forEach((r) => r.addedNodes.forEach((n) => {
     if (n.nodeType === 1) icons.hydrate(n)
