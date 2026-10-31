@@ -3,6 +3,7 @@
 // Split out of app.js so the take-level editing code stays readable.
 
 import * as tracks from './tracks.js'
+import * as capture from './capture.js'
 import * as automation from './automation.js'
 import * as synth from './synth.js'
 import * as drums from './drums.js'
@@ -244,7 +245,13 @@ export function attach(app) {
     if (!el) return
     if (el.dataset.mute) { tracks.toggleMute(findTrack(el.dataset.mute)); syncTrackDom(findTrack(el.dataset.mute)); syncAudibility() }
     else if (el.dataset.solo) { tracks.toggleSolo(findTrack(el.dataset.solo)); syncAll() }
-    else if (el.dataset.arm) { tracks.toggleArm(findTrack(el.dataset.arm)); syncTrackDom(findTrack(el.dataset.arm)); syncAudibility() }
+    else if (el.dataset.arm) {
+      const t = findTrack(el.dataset.arm)
+      tracks.toggleArm(t)
+      syncTrackDom(t)
+      syncAudibility()
+      onArmChanged(t)
+    }
     else if (el.dataset.trackMenu) {
       state.fxTarget = el.dataset.trackMenu
       openMenu($('menu-track'), el.getBoundingClientRect().left, el.getBoundingClientRect().bottom + 6)
@@ -590,7 +597,7 @@ export function attach(app) {
       for (let b = 0; b <= 32; b += 4) g.fillRect(b * (W / 32), 0, 1, H)
       const beatsPerSecond = Number($('in-bpm').value) / 60
       const lowest = state.notes.length ? Math.min(...state.notes.map(n => Math.floor(n.midi))) : 48
-      const low = Math.max(24, Math.min(48, lowest - 2))
+      const low = Math.max(24, lowest - 2)
       state.notes.forEach((n) => {
         const row = 23 - (Math.round(n.midi) - low)
         if (row < 0 || row > 23) return
@@ -621,7 +628,7 @@ export function attach(app) {
       const row = rows - 1 - (n.midi - r.lowMidi)
       if (row < 0 || row >= rows) return
       g.fillStyle = opts.preview ? '#4e86c9' : '#6fa8ff'
-      g.fillRect(gut + n.start * beatW, row * rowH + 2, Math.max(3, n.dur * beatW), Math.max(2, rowH - 4))
+      g.fillRect(gut + n.start * beatW, row * rowH + 2, Math.max(3, n.dur * beatW), Math.max(3, rowH - 3))
     })
     if (gut) drawPitchLabels(g, W, H, rows, r.lowMidi)
   }
@@ -675,7 +682,11 @@ export function attach(app) {
     } catch { /* audio blocked */ }
   }
 
+  // The persist module owns these: it edits the active roll *or* the take notes
+  // and records the edit on the editor's undo stack. The inline path is only the
+  // fallback for a build without it.
   $('btn-quantize').addEventListener('click', () => {
+    if (state.persist?.quantize?.()) return
     const r = activeRoll()
     if (!r) return
     state.undoRoll.push(roll.cloneRoll(r))
@@ -684,6 +695,7 @@ export function attach(app) {
     app.log('roll quantized')
   })
   $('btn-lock-scale').addEventListener('click', () => {
+    if (state.persist?.lockScale?.()) return
     const r = activeRoll()
     if (!r) return
     state.undoRoll.push(roll.cloneRoll(r))
@@ -1376,6 +1388,292 @@ export function attach(app) {
     }
   })
 
+  // ---------------------------------------------------------------- input column
+  // The inspector's left column: device list, channel select, Input Level /
+  // Monitoring tabs, and a meter fed by a real analyser. The stream is opened
+  // only while a track is armed or monitoring is on, so the mic light is honest.
+  const AUDIO_TYPES = new Set(['voice', 'guitar', 'bass', 'sampler', 'loop'])
+  const isAudioTrack = (t) => Boolean(t && AUDIO_TYPES.has(t.type))
+  const insDb = () => document.querySelector('.ins-db')
+  const insFill = () => document.querySelector('.ins-meter i')
+  let inputTimer = 0
+  let inputBuf = null
+  let lastDbPaint = 0
+  const monitoring = () => $('btn-monitor')?.getAttribute('aria-pressed') === 'true'
+  const masterDb = () => {
+    const v = Number($('in-gain')?.value)
+    return Number.isFinite(v) ? v : 0
+  }
+
+  function paintMeter(db) {
+    const pct = Number.isFinite(db) ? Math.min(100, Math.max(0, ((db + 60) / 60) * 100)) : 0
+    const fill = insFill()
+    if (fill) fill.style.width = `${pct.toFixed(1)}%`
+    document.querySelector('.ins-meter')?.toggleAttribute('data-hot', Number.isFinite(db) && db > -9)
+    const now = performance.now()
+    if (now - lastDbPaint < 80) return
+    lastDbPaint = now
+    const el = insDb()
+    if (el) {
+      el.textContent = Number.isFinite(db) ? `${db.toFixed(1)} dBFS` : '-∞ dBFS'
+      el.classList.remove('denied')
+    }
+  }
+
+  function meterFrame() {
+    const input = state.input
+    if (!input) return
+    if (!inputBuf || inputBuf.length !== input.analyser.fftSize) inputBuf = new Float32Array(input.analyser.fftSize)
+    input.analyser.getFloatTimeDomainData(inputBuf)
+    let peak = 0
+    for (let i = 0; i < inputBuf.length; i++) {
+      const v = Math.abs(inputBuf[i])
+      if (v > peak) peak = v
+    }
+    paintMeter(peak > 1e-7 ? 20 * Math.log10(peak) : -Infinity)
+  }
+
+  function startMeter() {
+    if (!inputTimer) inputTimer = setInterval(meterFrame, 60)
+  }
+
+  function stopMeter() {
+    if (inputTimer) clearInterval(inputTimer)
+    inputTimer = 0
+    inputBuf = null
+    const fill = insFill()
+    if (fill) fill.style.width = '0%'
+    document.querySelector('.ins-meter')?.removeAttribute('data-hot')
+    const el = insDb()
+    if (el && !state.micDenied) el.textContent = '-∞ dBFS'
+  }
+
+  async function refreshDevices() {
+    const sel = $('in-device')
+    if (!sel) return
+    const prev = sel.value
+    let inputs = []
+    try {
+      inputs = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput')
+    } catch (err) { /* enumeration can fail before permission on some builds */ }
+    const labelled = inputs.some((d) => d.label)
+    sel.innerHTML = ''
+    const fallback = document.createElement('option')
+    fallback.value = ''
+    fallback.textContent = state.micDenied
+      ? 'Default microphone — permission denied'
+      : labelled && inputs[0]?.label
+        ? `Default — ${inputs[0].label}`
+        : 'Default microphone'
+    sel.append(fallback)
+    inputs.forEach((d, i) => {
+      const opt = document.createElement('option')
+      opt.value = d.deviceId
+      opt.textContent = d.label || `Input ${i + 1}`
+      sel.append(opt)
+    })
+    sel.value = [...sel.options].some((o) => o.value === prev) ? prev : ''
+    refreshChannels()
+  }
+
+  function refreshChannels() {
+    const sel = $('in-channel')
+    if (!sel) return
+    const want = sel.value
+    const track = state.input?.stream?.getAudioTracks?.()[0]
+    let count = 1
+    try { count = track?.getSettings().channelCount || 1 } catch (err) { count = 1 }
+    sel.innerHTML = '<option>Channel 1</option>' + (count > 1 ? '<option>Channel 2</option>' : '')
+    if (want === 'Channel 2' && count > 1) sel.value = 'Channel 2'
+    if (count > 1) sel.removeAttribute('title')
+    else sel.title = 'the selected device is mono'
+  }
+
+  function channelIndex() {
+    return $('in-channel')?.value === 'Channel 2' ? 1 : 0
+  }
+
+  function applyMonitor() {
+    if (!state.input) return
+    state.input.setMonitorDb(monitoring() ? masterDb() : -80)
+  }
+
+  function paintMonitorButton() {
+    const btn = $('btn-monitor')
+    if (!btn) return
+    const on = monitoring()
+    btn.setAttribute('aria-pressed', String(on))
+    btn.textContent = on ? 'Monitoring on' : 'Monitoring off'
+    btn.classList.toggle('on', on)
+  }
+
+  async function ensureInput() {
+    if (state.inputStale) { state.inputStale = false; closeInput() }
+    if (state.input?.stream?.active) return state.input
+    if (state.inputOpen) return state.inputOpen
+    state.inputOpen = (async () => {
+      try {
+        const input = await capture.openInput({
+          deviceId: $('in-device')?.value || '',
+          channels: 2,
+        })
+        state.input = input
+        state.micDenied = false
+        $('ins-denial')?.setAttribute('hidden', '')
+        startMeter()
+        await refreshDevices()
+        const label = input.stream.getAudioTracks?.()[0]?.label || 'microphone'
+        app.log(`input ready: ${label}`)
+        if (!state.rec && $('mic-state')) $('mic-state').textContent = 'input armed'
+        if (monitoring()) applyMonitor()
+        return input
+      } catch (err) {
+        state.input = null
+        const denied = err?.message === 'mic denied'
+        state.micDenied = denied
+        stopMeter()
+        app.log(denied
+          ? 'mic denied — allow the microphone in Chrome, the demo take is kept'
+          : `input: ${err?.message || err}`)
+        const el = insDb()
+        if (el) {
+          el.textContent = denied ? 'denied' : 'unavailable'
+          el.classList.add('denied')
+        }
+        $('ins-denial')?.removeAttribute('hidden')
+        refreshDevices().catch(() => {})
+        return null
+      } finally {
+        state.inputOpen = null
+      }
+    })()
+    return state.inputOpen
+  }
+
+  function closeInput() {
+    const input = state.input
+    state.input = null
+    stopMeter()
+    if (!state.rec && $('mic-state')) $('mic-state').textContent = 'mic idle'
+    try { input?.close() } catch (err) { /* already torn down */ }
+  }
+
+  function onArmChanged(t) {
+    if (!t) return
+    if (t.armed && isAudioTrack(t)) { ensureInput().catch(() => {}) }
+    else if (t.armed) app.log(`${t.name} is a MIDI track — arm a Voice/Audio track to record`)
+    else if (!state.tracks.some((x) => x.armed) && !monitoring()) closeInput()
+  }
+
+  function buildInputColumn() {
+    const left = document.querySelector('.ins-left')
+    const level = left?.querySelector('.ins-level')
+    const subtabs = left?.querySelector('.ins-subtabs')
+    const tabs = [...(left?.querySelectorAll('.ins-sub') || [])]
+    if (!left || !level || !subtabs || tabs.length < 2) return
+
+    const meter = level.querySelector('.ins-meter')
+    if (meter && !meter.id) meter.id = 'ins-meter'
+    const db = level.querySelector('.ins-db')
+    if (db && !db.id) db.id = 'ins-db'
+
+    const bodies = document.createElement('div')
+    bodies.className = 'ins-bodies'
+    const levelPane = document.createElement('div')
+    levelPane.className = 'ins-pane'
+    levelPane.dataset.pane = 'level'
+    level.replaceWith(levelPane)
+    levelPane.append(level)
+
+    const denial = document.createElement('p')
+    denial.id = 'ins-denial'
+    denial.className = 'ins-note ins-denied'
+    denial.hidden = true
+    denial.textContent = 'Microphone blocked — allow it in Chrome, then arm again.'
+    levelPane.append(denial)
+
+    const monPane = document.createElement('div')
+    monPane.className = 'ins-pane'
+    monPane.dataset.pane = 'monitor'
+    monPane.hidden = true
+    monPane.innerHTML = `<button class="pill ins-monitor" id="btn-monitor" type="button" aria-pressed="false">Monitoring off</button>
+      <p class="ins-note">Routes the mic straight to the master. Use headphones so the speakers do not feed back.</p>`
+    bodies.append(levelPane, monPane)
+    subtabs.after(bodies)
+
+    const select = (index) => {
+      tabs.forEach((tab, i) => {
+        const on = i === index
+        tab.classList.toggle('on', on)
+        tab.setAttribute('aria-selected', String(on))
+        tab.tabIndex = on ? 0 : -1
+      })
+      levelPane.hidden = index !== 0
+      monPane.hidden = index === 0
+    }
+    tabs.forEach((tab, i) => {
+      tab.addEventListener('click', () => select(i))
+      tab.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
+        e.preventDefault()
+        const next = (i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length
+        tabs[next].focus()
+        select(next)
+      })
+    })
+    select(0)
+
+    $('btn-monitor').addEventListener('click', async () => {
+      const on = !monitoring()
+      const btn = $('btn-monitor')
+      btn.setAttribute('aria-pressed', String(on))
+      paintMonitorButton()
+      if (on) {
+        const input = await ensureInput()
+        if (!input) {
+          btn.setAttribute('aria-pressed', 'false')
+          paintMonitorButton()
+          app.log('monitoring needs mic access')
+          return
+        }
+        applyMonitor()
+        app.log(`monitoring on — mic routed to master (${masterDb().toFixed(1)} dB)`)
+        return
+      }
+      applyMonitor()
+      app.log('monitoring off')
+      if (!state.tracks.some((x) => x.armed)) closeInput()
+    })
+  }
+
+  buildInputColumn()
+  function inputChanged() {
+    if (state.rec) {
+      state.inputStale = true
+      app.log('input change: applies to the next take')
+      return
+    }
+    closeInput()
+    ensureInput().catch(() => {})
+  }
+  $('in-device')?.addEventListener('change', inputChanged)
+  refreshDevices()
+  navigator.mediaDevices?.addEventListener?.('devicechange', refreshDevices)
+  $('in-channel')?.addEventListener('change', () => {
+    if (!state.input) return
+    if (state.rec) { state.inputStale = true; app.log('input change: applies to the next take'); return }
+    closeInput()
+    ensureInput().catch(() => {})
+  })
+  $('in-gain')?.addEventListener('input', () => { if (monitoring()) applyMonitor() })
+  navigator.mediaDevices?.addEventListener?.('devicechange', () => { refreshDevices().catch(() => {}) })
+  refreshDevices().catch(() => {})
+  window.addEventListener('pagehide', () => closeInput())
+  state.input = null
+  state.inputOpen = null
+  state.inputStale = false
+  state.micDenied = false
+
   // ---------------------------------------------------------------- count-in
   const countBadge = document.createElement('span')
   countBadge.id = 'count-in'
@@ -1413,12 +1711,36 @@ export function attach(app) {
     countTimer = setInterval(tick, spb * 1000)
   }
 
+  function cancelCountIn() {
+    if (!transport.counting) return
+    clearInterval(countTimer)
+    countTimer = 0
+    transport.counting = false
+    $('count-in').hidden = true
+    document.body.classList.remove('counting')
+    metroStop()
+  }
+
   // capture phase so the count-in can hold app.js's record handler back
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#btn-record')) return
     if (state.countSkip) { state.countSkip = false; return }
     if (state.rec) { metroStop(); return }
-    if (!state.countIn || transport.counting) {
+    // a second press during the count-in skips the wait and records now.
+    // The click is deferred: a click() nested inside a dispatched click is
+    // swallowed by the click-in-progress flag.
+    if (transport.counting) {
+      cancelCountIn()
+      e.preventDefault()
+      e.stopPropagation()
+      setTimeout(() => {
+        state.countSkip = true
+        $('btn-record').click()
+      }, 0)
+      if (state.metronome) setTimeout(() => metroStart(0), 120)
+      return
+    }
+    if (!state.countIn) {
       if (state.metronome) setTimeout(() => metroStart(0), 120)
       return
     }
@@ -1695,6 +2017,26 @@ export function attach(app) {
       if (bars !== undefined) { state.countIn = bars; $('in-countin').value = String(bars) }
       return state.countIn
     },
+    input: {
+      ensure: () => ensureInput(),
+      close: () => closeInput(),
+      analyser: () => state.input?.analyser || null,
+      stream: () => state.input?.stream || null,
+      channel: () => channelIndex(),
+      device: () => $('in-device')?.value || '',
+      label: () => document.querySelector('#in-device option:checked')?.textContent || 'microphone',
+      monitoring: () => monitoring(),
+      refresh: () => refreshDevices(),
+      syncArmed: () => {
+        if (state.tracks.some((t) => t.armed && isAudioTrack(t))) {
+          ensureInput().then((input) => {
+            // permission can still be settling at boot; one retry after a beat
+            if (!input) setTimeout(() => { ensureInput().catch(() => {}) }, 700)
+          })
+        } else if (!monitoring()) closeInput()
+      },
+      refreshIfStale: () => { if (state.inputStale) ensureInput().catch(() => {}) },
+    },
     addTrack: (type) => { const t = tracks.addTrack(state.tracks, { type, name: tracks.typeInfo(type).label }); if (tracks.typeInfo(type).midi) state.rolls.set(t.id, roll.createRoll()); if (type === 'drums') state.patterns.set(t.id, drums.createPattern()); renderTrackList(); return t.id },
     setActive(id) { state.active = id; renderChain(findTrack(id)); drawRoll() },
     chain: () => state.tracks.find(t => t.id === state.active)?.chain.effects,
@@ -1722,7 +2064,7 @@ export function rollBounds(state) {
   const r = state.rolls?.get(state.active)
   if (r) return { low: r.lowMidi, rows: ROLL_ROWS, beats: r.lengthBeats }
   const lowest = state.notes.length ? Math.min(...state.notes.map((n) => Math.floor(n.midi))) : 48
-  return { low: Math.max(24, Math.min(48, lowest - 2)), rows: ROLL_ROWS, beats: VOICE_BEATS }
+  return { low: Math.max(24, lowest - 2), rows: ROLL_ROWS, beats: VOICE_BEATS }
 }
 
 // Pointer position -> { beat, midi } in the active roll, unclamped so a drag

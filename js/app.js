@@ -16,6 +16,7 @@ import * as icons from './icons.js'
 import { install as installPanels } from './panels.js'
 import { install as installTimeline } from './timeline.js'
 import { install as installEdit } from './edit.js'
+import { install as installPersist } from './persist.js'
 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const DIVISION = 4
@@ -34,6 +35,7 @@ const state = {
   stems: null,
   demoDuration: null,
   playhead: 0,
+  live: null,
 }
 
 // ---- helpers ---------------------------------------------------------------
@@ -178,32 +180,27 @@ function syncTuning() {
   ))
 }
 
-function drawWave() {
-  const canvas = $('wave')
-  const clip = document.querySelector('.clip')
-  if (clip) {
-    // a real take spans the whole arrangement; the default is one bar (--ppb)
-    clip.toggleAttribute('data-full', !!state.demoDuration)
-    clip.title = state.demoDuration ? `${state.demoDuration.toFixed(1)} s take` : ''
-    const w = Math.max(1, Math.round(clip.clientWidth - 20))
-    if (canvas.width !== w) canvas.width = w
-  }
+function drawTake(canvas, take) {
+  if (!canvas) return
   const g = canvas.getContext('2d')
   g.fillStyle = '#0e0e13'
   g.fillRect(0, 0, canvas.width, canvas.height)
-  if (!state.take?.length) return
+  if (!take?.length) return
   const mid = canvas.height / 2
-  const step = Math.max(1, Math.floor(state.take.length / canvas.width))
-  /* dB scale, 48 dB of range. Linear normalisation clamps every loud column to full
-     height on a mastered mix and the waveform turns into slabs. */
+  const step = Math.max(1, Math.floor(take.length / canvas.width))
+  /* dB scale, 24 dB of range, referenced to the take's own peak so a quiet
+     room recording still shows its shape instead of a flat line. */
   const DB = 24
-  const d = (v) => Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6)) + DB) / DB))
+  let ref = 0
+  for (let i = 0; i < take.length; i += Math.max(1, Math.floor(take.length / 4096))) ref = Math.max(ref, Math.abs(take[i]))
+  ref = Math.max(ref, 1e-4)
+  const d = (v) => Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6) / ref) + DB) / DB))
   const rms = new Float32Array(canvas.width)
   const peaks = new Float32Array(canvas.width)
   for (let x = 0; x < canvas.width; x++) {
     let sum = 0, n = 0
-    for (let i = x * step; i < (x + 1) * step && i < state.take.length; i++, n++) {
-      const v = state.take[i]
+    for (let i = x * step; i < (x + 1) * step && i < take.length; i++, n++) {
+      const v = take[i]
       sum += v * v
       peaks[x] = Math.max(peaks[x], Math.abs(v))
     }
@@ -236,6 +233,19 @@ function drawWave() {
   g.stroke()
 }
 
+function drawWave() {
+  const canvas = $('wave')
+  const clip = document.querySelector('.clip')
+  if (clip) {
+    // a real take spans the whole arrangement; the default is one bar (--ppb)
+    clip.toggleAttribute('data-full', !!state.demoDuration)
+    if (state.demoDuration) clip.title = `${state.demoDuration.toFixed(1)} s take`
+    const w = Math.max(1, Math.round(clip.clientWidth - 20))
+    if (canvas.width !== w) canvas.width = w
+  }
+  drawTake(canvas, state.take)
+}
+
 function readMeter() {
   if (!state.take?.length) return
   const { report } = masterChain(stereoFrom(state.take), settings(), state.sampleRate)
@@ -250,37 +260,211 @@ function readMeter() {
 }
 
 // ---- recording -------------------------------------------------------------
+const AUDIO_TYPES = new Set(['voice', 'guitar', 'bass', 'sampler', 'loop'])
+const isAudioTrack = (t) => Boolean(t && AUDIO_TYPES.has(t.type))
+
+/* The armed audio track is the target. Nothing armed: arm what the user is
+   looking at, or the voice track, and say so. */
+function recordTarget() {
+  const armed = state.tracks.filter(t => t.armed && isAudioTrack(t))
+  if (armed.length) return armed[0]
+  if (state.tracks.some(t => t.armed)) log('armed track is MIDI — recording to an audio track')
+  const active = state.tracks.find(t => t.id === state.active)
+  const target = isAudioTrack(active) ? active : state.tracks[0]
+  const btn = document.querySelector(`[data-arm="${target.id}"]`)
+  if (btn && !target.armed) { btn.click(); log(`armed ${target.name} for recording`) }
+  return target
+}
+
+/* Region 0 of a track: the static clip-1 for the voice track, a clip built on
+   demand for any other lane. */
+function takeSurface(track) {
+  if (!track) return null
+  if (track.id === state.tracks[0]?.id) {
+    return { canvas: $('wave'), clip: document.getElementById('clip-1') }
+  }
+  const row = document.querySelector(`.lane-row[data-row="${track.id}"]`)
+  if (!row) return null
+  let clip = row.querySelector(':scope > .clip')
+  if (!clip) {
+    clip = document.createElement('div')
+    clip.className = 'clip tl-clip'
+    clip.dataset.clip = track.id
+    clip.dataset.regionIndex = '0'
+    clip.innerHTML = `<div class="clip-head"><h3>${track.name}</h3><span class="clip-gain">gain <output>0.0 dB</output></span></div>
+      <canvas class="wave" width="1200" height="120"></canvas>`
+    row.prepend(clip)
+  }
+  let canvas = clip.querySelector('canvas')
+  if (!canvas) {
+    canvas = document.createElement('canvas')
+    canvas.className = 'wave'
+    canvas.width = 1200
+    canvas.height = 120
+    clip.append(canvas)
+  }
+  return { canvas, clip }
+}
+
+function startLiveTake(track, rec) {
+  stopLiveTake()
+  const surface = rec.surface
+  if (!surface?.canvas) return
+  const lane = $('lane')
+  const live = {
+    canvas: surface.canvas,
+    clip: surface.clip,
+    peaks: [],
+    buf: new Float32Array(rec.analyser?.fftSize || 2048),
+    started: performance.now(),
+    pxPerSec: 92,
+    maxWidth: Math.max(160, (lane?.clientWidth || 800) - 48),
+    timer: 0,
+  }
+  state.live = live
+  if (surface.clip) {
+    surface.clip.style.width = '48px'
+    surface.clip.style.minWidth = '0px'
+    surface.clip.dataset.recording = 'true'
+  }
+  live.timer = setInterval(liveFrame, 60)
+}
+
+function liveFrame() {
+  const live = state.live
+  if (!live) return
+  const drain = state.rec?.input?.live?.drain
+  if (drain) {
+    const queued = drain()
+    if (queued.length) live.peaks.push(...queued)
+  } else {
+    const analyser = state.rec?.analyser
+    if (analyser) {
+      if (live.buf.length !== analyser.fftSize) live.buf = new Float32Array(analyser.fftSize)
+      analyser.getFloatTimeDomainData(live.buf)
+      let peak = 0
+      for (let i = 0; i < live.buf.length; i++) {
+        const v = Math.abs(live.buf[i])
+        if (v > peak) peak = v
+      }
+      live.peaks.push(peak)
+    }
+  }
+  const seconds = (performance.now() - live.started) / 1000
+  const width = Math.min(live.maxWidth, 48 + seconds * live.pxPerSec)
+  if (live.clip) live.clip.style.width = `${width.toFixed(0)}px`
+  const g = live.canvas.getContext('2d')
+  const w = Math.max(1, Math.round(width - 20))
+  if (live.canvas.width !== w) live.canvas.width = w
+  const h = live.canvas.height
+  const mid = h / 2
+  g.fillStyle = '#0e0e13'
+  g.fillRect(0, 0, w, h)
+  if (!live.peaks.length) return
+  /* dBFS scale so a quiet built-in mic still draws a shape (drawTake uses a
+     24 dB window; the live view is deliberately hotter while recording) */
+  const d = (v) => Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6)) + 48) / 48))
+  g.strokeStyle = '#6fa8ff'
+  g.beginPath()
+  for (let x = 0; x < w; x++) {
+    const peak = live.peaks[Math.min(live.peaks.length - 1, Math.floor((x / w) * live.peaks.length))] || 0
+    const amp = d(peak) * (mid - 2)
+    g.moveTo(x + 0.5, mid - amp)
+    g.lineTo(x + 0.5, mid + amp)
+  }
+  g.stroke()
+}
+
+function stopLiveTake() {
+  const live = state.live
+  state.live = null
+  if (!live) return
+  clearInterval(live.timer)
+  if (live.clip) {
+    live.clip.style.width = ''
+    live.clip.style.minWidth = ''
+    delete live.clip.dataset.recording
+  }
+}
+
+function redrawTrackTake(track, surface) {
+  if (!track) return
+  if (track.id === state.tracks[0]?.id) drawWave()
+  else drawTake(surface?.canvas, state.take)
+}
+
 async function toggleRecord() {
   if (state.rec) {
     const rec = state.rec
     state.rec = null
     $('btn-record').classList.remove('on')
     clearInterval(state.timer)
-    const take = await rec.stop()
-    state.sampleRate = rec.sampleRate
-    state.demoDuration = null
+    let take = new Float32Array(0)
+    try { take = await rec.stop() } catch (err) { log(`record: ${err?.message || err}`) }
+    stopLiveTake()
+    const rate = rec.sampleRate || state.sampleRate
+    if (!take.length) {
+      $('mic-state').textContent = 'empty take'
+      status('ready')
+      redrawTrackTake(rec.track, rec.surface)
+      log('recorded 0 samples — previous take kept')
+      state.studio?.input?.refreshIfStale?.()
+      return
+    }
+    state.sampleRate = rate
     state.take = take
-    state.notes = pitch.detectNotes(take, rec.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
     state.selected = null
-    $('mic-state').textContent = take.length ? `captured ${take.length} samples` : 'empty take'
+    state.demoDuration = null
+    if (rec.track.id === state.tracks[0]?.id) $('proj-name').value = 'Take 1'
+    if (rec.surface?.clip) {
+      /* size the region to the take: one bar is (60 / bpm) * 4 seconds and the
+         lane's --ppb is its pixel width, so the clip stops stretching a short
+         take across the whole arrangement */
+      const secs = take.length / rate
+      const barSeconds = (60 / (Number($('in-bpm').value) || 96)) * 4
+      const ppb = parseFloat(getComputedStyle($('lane')).getPropertyValue('--ppb')) || 77
+      rec.surface.clip.style.width = `${Math.max(12, (secs / barSeconds) * ppb)}px`
+      rec.surface.clip.style.minWidth = '0px'
+      rec.surface.clip.title = `${secs.toFixed(1)} s take`
+      rec.surface.clip.removeAttribute('data-full')
+      if (rec.track.clip) rec.track.clip.lengthBeats = Math.max(1, (secs / barSeconds) * 4)
+    }
+    // detection is decimated for long takes; it still fills the editor
+    state.notes = (await detectTakeNotes(take, rate)).map(n => ({ ...n, origMidi: n.midi }))
+    $('mic-state').textContent = `captured ${take.length} samples`
     status('ready')
     resetHarmonies()
-    drawWave()
+    if (rec.track.id === state.tracks[0]?.id) drawWave()
+    else drawTake(rec.surface?.canvas, take)
     renderNotes()
+    log(`recorded ${(take.length / rate).toFixed(2)} s onto ${rec.track.name} (${take.length} samples, ${state.notes.length} notes)`)
+    state.studio?.input?.refreshIfStale?.()
     return
   }
 
   if (!capture.isSupported()) throw new Error('mic unsupported')
-  const rec = await capture.startRecording()
+  const track = recordTarget()
+  const input = await state.studio?.input?.ensure()
+  if (!input) {
+    status('ready')
+    throw new Error('recording needs mic access — take kept')
+  }
+  const rec = await capture.startRecording({ input, channel: state.studio.input.channel() })
+  rec.track = track
+  rec.input = input
+  rec.surface = takeSurface(track)
+  input.live?.clear()
   state.rec = rec
   $('btn-record').classList.add('on')
   $('mic-state').textContent = 'mic live'
   $('rec-timer').textContent = '0.0s'
   status('recording')
   const started = performance.now()
+  rec.started = started
   state.timer = setInterval(() => {
     $('rec-timer').textContent = `${((performance.now() - started) / 1000).toFixed(1)}s`
   }, 100)
+  startLiveTake(track, rec)
 }
 
 // ---- playback --------------------------------------------------------------
@@ -615,22 +799,8 @@ function currentPatch() {
 }
 
 // ---- project ---------------------------------------------------------------
-function saveProject() {
-  const project = { version: 1, bpm: Number($('in-bpm').value), notes: state.notes, patch: currentPatch(), sampleRate: state.sampleRate }
-  download(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }), 'apollo-studios-project.json')
-  log('project saved')
-}
-
-async function openProject(file) {
-  const data = JSON.parse(await file.text())
-  if (!Array.isArray(data.notes)) throw new Error('project: notes missing')
-  state.notes = data.notes.map(n => ({ ...n }))
-  $('in-bpm').value = String(data.bpm ?? 96)
-  const check = presets.validatePatch(data.patch)
-  if (check.ok) applyPatch(data.patch, data.patch.name)
-  renderNotes()
-  log(`project opened: ${state.notes.length} notes`)
-}
+// Save/open live in js/persist.js now: one local slot per browser, a full-state
+// restore, and a `.apollo.json` download. app.js only binds the picker.
 
 // ---- demo ------------------------------------------------------------------
 const DEMO_FILE = 'assets/skin.wav'
@@ -674,6 +844,11 @@ async function loadDemo() {
   state.sampleRate = buffer.sampleRate
   state.demoDuration = take.length / buffer.sampleRate
   state.take = take
+  // a recorded take sizes the region to itself; the demo take owns the lane
+  const firstTrack = state.tracks?.[0]
+  if (firstTrack?.clip) { firstTrack.clip.startBeat = 0; firstTrack.clip.lengthBeats = 4 }
+  const firstClip = document.getElementById('clip-1')
+  if (firstClip) { firstClip.style.width = ''; firstClip.style.minWidth = '' }
   state.notes = (await detectTakeNotes(take, buffer.sampleRate)).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
   $('mic-state').textContent = 'skin'
@@ -732,7 +907,7 @@ function boot() {
   $('btn-stop').addEventListener('click', stopPlayback)
   $('btn-analyze').addEventListener('click', guard(readMeter))
   $('btn-export').addEventListener('click', guard(exportWav))
-  $('btn-save').addEventListener('click', guard(saveProject))
+  // #btn-save is owned by js/persist.js (local slot + Last Saved stamp)
   $('btn-demo').addEventListener('click', guard(loadDemo))
   $('btn-harmony').addEventListener('click', guard(buildHarmonies))
   $('btn-character').addEventListener('click', guard(applyCharacter))
@@ -767,10 +942,12 @@ function boot() {
     log(`preset imported: ${result.patch.name}`)
     e.target.value = ''
   }))
+  // the project's file picker: js/persist.js does the parsing and the restore
   $('file-project').addEventListener('change', guard(async (e) => {
     const file = e.target.files?.[0]
-    if (file) await openProject(file)
-    e.target.value = ''  }))
+    if (file) await state.persist?.openFile?.(file)
+    e.target.value = ''
+  }))
 
   /* toolbar / rail / tab chrome: a drawer button shows its panel; any Export button exports */
   const TAB_FOR = { tools: 'harmony', presets: 'harmony' }
@@ -851,6 +1028,8 @@ function boot() {
   installPanels({ state, log })
   installTimeline({ state, log })
   installEdit({ state, log })
+  installPersist({ state, log })
+  state.studio?.input?.syncArmed?.()
   icons.hydrate()
   new MutationObserver((rows) => rows.forEach((r) => r.addedNodes.forEach((n) => {
     if (n.nodeType === 1) icons.hydrate(n)
@@ -858,6 +1037,7 @@ function boot() {
   $('lane').addEventListener('pointerdown', setPlayheadFromEvent)
   $('lane').addEventListener('scroll', () => { const rr = $('ruler-row'); if (rr) rr.scrollLeft = $('lane').scrollLeft })
   $('ruler').parentElement.classList.add('ruler-scroll')
+  window.addEventListener('pagehide', () => { stopLiveTake(); state.studio?.input?.close() })
   status('ready')
 }
 

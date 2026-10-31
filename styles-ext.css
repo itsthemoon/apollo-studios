@@ -310,10 +310,10 @@ body.counting .rec-dot { animation: none; }
 .menu-range output { font-family: var(--mono); font-size: 10.5px; color: var(--dim); min-width: 30px; text-align: right; }
 
 /* ------------------------------------------------------------- mixer extras */
-.mixer { flex: 0 0 214px; }
+.mixer { flex: 0 0 226px; }
 .strips { flex: 1 1 auto; overflow: auto; align-items: flex-start; }
-.strip { flex: 0 0 62px; gap: 4px; }
-.strip b { max-height: 26px; }
+.strip { flex: 0 0 66px; gap: 4px; }
+.strip b { max-height: 30px; font-size: 9.5px; line-height: 1.15; }
 .strip .mlab { display: none; }
 .strip .db { font-size: 9px; line-height: 1; }
 .strip .mstag .ms { height: 16px; }
@@ -343,3 +343,20 @@ body.counting .rec-dot { animation: none; }
 .strip.master { flex: 0 0 84px; }
 .strip.master b { max-height: 64px; }
 .strip.master > input[type="range"] { height: 64px; }
+
+/* input column: tab bodies, denial note, monitoring pane */
+.ins-bodies { display: block; }
+.ins-pane { display: flex; flex-direction: column; gap: 8px; padding-top: 9px; }
+.ins-pane[hidden] { display: none; }
+.ins-sub { cursor: pointer; }
+.ins-meter { transition: width 60ms linear; }
+.ins-meter[data-hot] i { background: var(--gold); }
+.ins-db.denied { color: var(--gold); font-size: 9px; }
+.ins-note { margin: 0; font-size: 9px; line-height: 1.35; color: var(--faint); }
+.ins-denied { color: var(--gold); }
+.ins-monitor { align-self: flex-start; height: 24px; padding: 0 10px; font-size: 10px; }
+.ins-monitor[aria-pressed="true"] { border-color: var(--cyan); color: #06262a; background: var(--cyan); }
+/* a clip being recorded grows from the left and reads as live */
+.clip[data-recording] { border-color: var(--red-hot); min-width: 0; }
+.clip[data-recording] .clip-head h3::after { content: ' REC'; color: var(--red-hot); font-size: 9px; letter-spacing: 0.08em; }
+.clip canvas.wave { display: block; width: 100%; height: calc(100% - 18px); }
