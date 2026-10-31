@@ -73,6 +73,13 @@ body.tl-auto .clip #wave { height: calc(100% - 64px); }
 .ruler-select { position: absolute; top: 0; bottom: 0; pointer-events: none;
   background: rgba(0, 198, 209, 0.10); border-top: 1px solid rgba(0, 198, 209, 0.55); }
 body.tl-dragging { cursor: ew-resize; user-select: none; }
+.clip.tl-clip { cursor: default; }
+.clip.tl-clip.tl-selected-source { cursor: grab; }
+body.tl-moving { cursor: grabbing; user-select: none; }
+body.tl-moving .clip { cursor: grabbing; }
+.tl-marquee { position: fixed; z-index: 60; pointer-events: none;
+  border: 1px dashed rgba(0, 198, 209, 0.9); background: rgba(0, 198, 209, 0.1); }
+body.tl-marqueeing { user-select: none; }
 `
 
 const makeClip = (over = {}) => ({
@@ -96,7 +103,12 @@ export function install({ state, log }) {
   if (!lane || !ruler || !menu) return
   state.tlReady = true
 
-  const ui = { drag: null, ruler: null, menu: null, selected: null, suppressClick: false, loopBack: null }
+  const ui = {
+    drag: null, ruler: null, menu: null, selected: null, suppressClick: false, loopBack: null,
+    sel: new Set(), marquee: null,
+  }
+  // the arrangement selection: a set of "trackId/index" keys, painted as .clip.sel
+  state.tlSel = ui.sel
 
   // ---------------------------------------------------------------- helpers
   function injectStyles() {
@@ -168,9 +180,43 @@ export function install({ state, log }) {
   function paintSelection() {
     document.querySelectorAll('.clip').forEach((node) => {
       const index = Number(node.dataset.regionIndex || 0)
-      node.classList.toggle('sel', ui.selected?.track === node.dataset.clip && ui.selected?.index === index)
+      const on = ui.sel.has(selKey(node.dataset.clip, index))
+      node.classList.toggle('sel', on)
+      node.classList.toggle('tl-selected-source', on)
+      if (on) node.setAttribute('aria-selected', 'true')
+      else node.removeAttribute('aria-selected')
     })
   }
+
+  // Selection keys are "trackId/index"; region 0 of a track is a clip like any
+  // other, so a marquee can take a whole lane and Delete can empty it.
+  const selKey = (trackId, index) => `${trackId}/${index}`
+  function parseKey(key) {
+    const at = String(key).lastIndexOf('/')
+    if (at < 1) return { track: null, index: 0 }
+    return { track: trackOf(String(key).slice(0, at)), index: Number(String(key).slice(at + 1)) || 0 }
+  }
+  function regionOf(key) {
+    const { track, index } = parseKey(key)
+    const region = regionAt(track, index)
+    return track && region ? { track, index, region } : null
+  }
+  function setSelection(keys) {
+    ui.sel = new Set(keys)
+    state.tlSel = ui.sel
+    ui.selected = ui.sel.size === 1 ? (() => {
+      const only = regionOf([...ui.sel][0])
+      return only ? { track: only.track.id, index: only.index } : null
+    })() : null
+    paintSelection()
+  }
+  function toggleSelection(key) {
+    const next = new Set(ui.sel)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    setSelection(next)
+  }
+  const clearSelection = () => { if (ui.sel.size) setSelection([]) }
 
   function mark(track) {
     const row = laneRowOf(track.id)
@@ -282,7 +328,8 @@ export function install({ state, log }) {
       if (title) setHead(title, clip.name || track.name)
       const out = node.querySelector('.clip-gain output, [data-clip-gain]')
       if (out) out.textContent = `${dbOf(clip.gain).toFixed(1)} dB`
-      node.classList.toggle('sel', ui.selected?.track === track.id && ui.selected?.index === index)
+      node.classList.toggle('sel', ui.sel.has(selKey(track.id, index)))
+      node.classList.toggle('tl-selected-source', ui.sel.has(selKey(track.id, index)))
     }
   }
 
@@ -336,7 +383,8 @@ export function install({ state, log }) {
     } else if (action === 'delete') {
       log('region deleted')
       dropRegion(track, target.index)
-      ui.selected = null
+      setSelection([])
+      ui.menu = null
     } else if (action === 'reverse') {
       region.reverse = !region.reverse
       log(`region ${region.reverse ? 'reversed' : 'forward'}`)
@@ -354,17 +402,198 @@ export function install({ state, log }) {
   function beginDrag(spec, pointerId) {
     ui.drag = { ...spec, pointerId, moved: false, startX: spec.startX }
     document.body.classList.add('tl-dragging')
-    try { spec.node.setPointerCapture(pointerId) } catch { /* capture is a nicety */ }
+    // a move waits for real movement before capturing: capture retargets the
+    // compatible click/dblclick, and a plain tap must keep its own target
+    if (spec.capture !== false) try { spec.node.setPointerCapture(pointerId) } catch { /* capture is a nicety */ }
   }
 
   function endDrag() {
     const drag = ui.drag
     if (!drag) return
     ui.drag = null
-    document.body.classList.remove('tl-dragging')
+    document.body.classList.remove('tl-dragging', 'tl-moving')
     try { drag.node.releasePointerCapture(drag.pointerId) } catch { /* already gone */ }
     if (drag.kind === 'trim') drag.node.classList.remove('trimming')
-    mark(drag.track)
+    if (drag.kind === 'move') drag.tracks.forEach((track) => mark(track))
+    else mark(drag.track)
+  }
+
+  // ---------------------------------------------------------------- undo
+  const MAX_CLIP_UNDO = 50
+  let pendingClips = null
+
+  // A snapshot in the editor's own shape (so its restore works unchanged) plus
+  // the arrangement's clips, which its restore does not know about.
+  function clipSnapshot() {
+    const edit = state.edit
+    return {
+      kind: 'voice',
+      active: state.active,
+      selected: state.selected,
+      notes: state.notes.map((n) => ({ ...n })),
+      sel: [...(edit?.sel || [])],
+      primary: edit?.primary ?? null,
+      rolls: new Map(state.rolls),
+      clips: state.tracks.map((t) => ({
+        id: t.id,
+        clip: t.clip ? { ...t.clip } : null,
+        clips: (t.clips || []).map((c) => ({ ...c })),
+      })),
+    }
+  }
+
+  /* edit.js owns the shared undo stacks but only knows notes and rolls. A clip
+     snapshot rides in an extra `clips` field and is re-applied the moment its
+     entry is popped, so Ctrl+Z, the toolbar buttons and persist's pushes all
+     keep working on one stack. Subclassing Array keeps push/pop/length honest
+     for every other caller. */
+  let stacksHooked = false
+  class ClipStack extends Array {
+    pop() {
+      const snap = super.pop()
+      if (snap?.clips) {
+        pendingClips = snap.clips
+        queueMicrotask(() => {
+          const list = pendingClips
+          pendingClips = null
+          applyClips(list)
+        })
+      }
+      return snap
+    }
+
+    push(snap) {
+      if (pendingClips && snap && typeof snap === 'object' && !snap.clips) snap.clips = pendingClips
+      return super.push(snap)
+    }
+  }
+
+  function hookUndo() {
+    const edit = state.edit
+    if (stacksHooked || !edit) return stacksHooked
+    edit.undo = ClipStack.from(edit.undo)
+    edit.redo = ClipStack.from(edit.redo)
+    stacksHooked = true
+    return true
+  }
+
+  function pushClipUndo() {
+    hookUndo()
+    const edit = state.edit
+    if (!edit) return false
+    edit.undo.push(clipSnapshot())
+    if (edit.undo.length > MAX_CLIP_UNDO) edit.undo.shift()
+    edit.redo.length = 0
+    return true
+  }
+
+  function applyClips(list) {
+    if (!Array.isArray(list)) return
+    const byId = new Map(list.map((entry) => [entry.id, entry]))
+    for (const track of state.tracks) {
+      const src = byId.get(track.id)
+      if (!src) continue
+      if (src.clip) track.clip = { ...src.clip }
+      track.clips = src.clips.map((c) => ({ ...c }))
+      mark(track)
+    }
+    syncLanes()
+    setSelection([...ui.sel].filter((key) => regionOf(key)))
+  }
+
+  function deleteSelection() {
+    const entries = [...ui.sel].map(regionOf).filter(Boolean)
+    if (!entries.length) return 0
+    pushClipUndo()
+    const byTrack = new Map()
+    for (const entry of entries) {
+      if (!byTrack.has(entry.track.id)) byTrack.set(entry.track.id, [])
+      byTrack.get(entry.track.id).push(entry.index)
+    }
+    for (const [id, indexes] of byTrack) {
+      const track = trackOf(id)
+      if (!track) continue
+      // high indices first so the extra-region offsets stay valid
+      indexes.sort((a, b) => b - a).forEach((index) => dropRegion(track, index))
+      mark(track)
+    }
+    setSelection([])
+    syncLanes()
+    log(`deleted ${entries.length} region${entries.length === 1 ? '' : 's'}`)
+    return entries.length
+  }
+
+  // ---------------------------------------------------------------- marquee
+  function marqueeRect(e, band) {
+    const box = lane.getBoundingClientRect()
+    const x = clamp(e.clientX, box.left, box.right)
+    const y = clamp(e.clientY, box.top, box.bottom)
+    return {
+      x0: Math.min(band.x0, x), y0: Math.min(band.y0, y),
+      x1: Math.max(band.x0, x), y1: Math.max(band.y0, y),
+    }
+  }
+
+  function clipsIn(rect) {
+    const out = []
+    document.querySelectorAll('#lane .clip').forEach((node) => {
+      const r = node.getBoundingClientRect()
+      if (!r.width || !r.height || !node.dataset.clip) return
+      if (r.right < rect.x0 || r.left > rect.x1 || r.bottom < rect.y0 || r.top > rect.y1) return
+      out.push(selKey(node.dataset.clip, Number(node.dataset.regionIndex || 0)))
+    })
+    return out
+  }
+
+  function paintMarquee(rect) {
+    if (!ui.band) {
+      ui.band = document.createElement('div')
+      ui.band.className = 'tl-marquee'
+      ui.band.setAttribute('aria-hidden', 'true')
+      document.body.append(ui.band)
+    }
+    const s = ui.band.style
+    s.left = `${rect.x0}px`
+    s.top = `${rect.y0}px`
+    s.width = `${Math.max(1, rect.x1 - rect.x0)}px`
+    s.height = `${Math.max(1, rect.y1 - rect.y0)}px`
+  }
+
+  function endMarquee() {
+    ui.marquee = null
+    document.body.classList.remove('tl-marqueeing')
+    ui.band?.remove()
+    ui.band = null
+  }
+
+  function beginMove(hit, e) {
+    const items = [...ui.sel]
+      .map(regionOf)
+      .filter(Boolean)
+      .map((x) => ({
+        node: document.querySelector(`.clip[data-clip="${x.track.id}"][data-region-index="${x.index}"]`),
+        track: x.track,
+        index: x.index,
+        region: x.region,
+        startBeat: x.region.startBeat,
+      }))
+      .filter((x) => x.node)
+    if (!items.length) return
+    // the grabbed region leads, so a clamp or a log reads the one under the pointer
+    const at = items.findIndex((x) => x.track.id === hit.track.id && x.index === hit.index)
+    if (at > 0) items.unshift(items.splice(at, 1)[0])
+    beginDrag({
+      kind: 'move',
+      node: hit.node,
+      track: hit.track,
+      startX: e.clientX,
+      capture: false,
+      step: state.snapBeats > 0 ? state.snapBeats : 0,
+      items,
+      tracks: [...new Set(items.map((x) => x.track))],
+      pushed: false,
+    }, e.pointerId)
+    document.body.classList.add('tl-moving')
   }
 
   // ---------------------------------------------------------------- loop band
@@ -539,8 +768,7 @@ export function install({ state, log }) {
     if (!trim && !fade) return
     e.preventDefault()
     e.stopPropagation()
-    ui.selected = { track: hit.track.id, index: hit.index }
-    paintSelection()
+    setSelection([selKey(hit.track.id, hit.index)])
     const kind = trim ? 'trim' : 'fade'
     const edge = trim ? trim.dataset.trim : fade.classList.contains('in') ? 'in' : 'out'
     if (trim && hit.node.hasAttribute('data-full') && hit.region.startBeat === 0
@@ -593,19 +821,68 @@ export function install({ state, log }) {
     }, e.pointerId)
   }, true)
 
+  // clip press: select (shift/cmd toggles) and start moving the whole selection
   document.addEventListener('pointerdown', (e) => {
     if (!e.isPrimary || e.button !== 0) return
+    if (e.target.closest('.tl-trim, .tl-fade, .auto-canvas, .auto-legend')) return
     const hit = pick(e)
     if (!hit) return
-    ui.selected = { track: hit.track.id, index: hit.index }
-    paintSelection()
+    const key = selKey(hit.track.id, hit.index)
+    if (e.shiftKey || e.metaKey) {
+      toggleSelection(key)
+      if (!ui.sel.has(key)) return
+    } else if (!ui.sel.has(key)) {
+      setSelection([key])
+    } else {
+      ui.selected = { track: hit.track.id, index: hit.index }
+      paintSelection()
+    }
+    beginMove(hit, e)
+  }, true)
+
+  // empty lane space: a drag draws a marquee and selects the clips it overlaps
+  document.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary || e.button !== 0) return
+    if (!lane.contains(e.target)) return
+    if (pick(e)) return
+    if (e.target.closest('button, input, select, a, .auto-canvas, .auto-legend')) return
+    ui.marquee = { pointerId: e.pointerId, x0: e.clientX, y0: e.clientY, base: new Set(ui.sel), moved: false }
+    document.body.classList.add('tl-marqueeing')
+    try { lane.setPointerCapture(e.pointerId) } catch { /* capture is a nicety */ }
   }, true)
 
   document.addEventListener('pointermove', (e) => {
+    const band = ui.marquee
+    if (band && e.pointerId === band.pointerId) {
+      const rect = marqueeRect(e, band)
+      if (rect.x1 - rect.x0 > 2 || rect.y1 - rect.y0 > 2) band.moved = true
+      if (!band.moved) return
+      paintMarquee(rect)
+      setSelection([...band.base, ...clipsIn(rect)])
+      return
+    }
     const drag = ui.drag
     if (!drag || e.pointerId !== drag.pointerId) return
     const dx = e.clientX - drag.startX
     if (Math.abs(dx) > 2) drag.moved = true
+    if (drag.kind === 'move') {
+      if (!drag.moved) return
+      if (!drag.captured) {
+        try { drag.node.setPointerCapture(drag.pointerId) } catch { /* already gone */ }
+        drag.captured = true
+      }
+      if (!drag.pushed) { pushClipUndo(); drag.pushed = true }
+      let delta = dx / pxPerBeat()
+      if (drag.step) delta = Math.round(delta / drag.step) * drag.step
+      // clamp the group together so nothing slides before beat 0
+      const low = Math.min(...drag.items.map((i) => i.startBeat))
+      if (low + delta < 0) delta = -low
+      for (const item of drag.items) {
+        item.region.startBeat = round2(item.startBeat + delta)
+        paintClip(item.node, item.track, item.region)
+      }
+      return
+    }
     if (drag.kind === 'trim') {
       const delta = dx / pxPerBeat()
       const end = drag.startBeat + drag.lengthBeats
@@ -645,13 +922,26 @@ export function install({ state, log }) {
   }, true)
 
   document.addEventListener('pointerup', (e) => {
+    const band = ui.marquee
+    if (band && e.pointerId === band.pointerId) {
+      const rect = marqueeRect(e, band)
+      const moved = band.moved
+      endMarquee()
+      try { lane.releasePointerCapture(e.pointerId) } catch { /* already gone */ }
+      if (!moved) { if (!e.shiftKey) setSelection([]); return }
+      setSelection([...band.base, ...clipsIn(rect)])
+      log(`selected ${ui.sel.size} region${ui.sel.size === 1 ? '' : 's'}`)
+      return
+    }
     if (!ui.drag || e.pointerId !== ui.drag.pointerId) return
     const drag = ui.drag
     if (drag.kind === 'auto') paintAuto(drag.track, drag.canvas)
+    if (drag.kind === 'move' && drag.moved) log(`moved ${drag.items.length} region${drag.items.length === 1 ? '' : 's'}`)
     endDrag()
   }, true)
 
   document.addEventListener('pointercancel', (e) => {
+    if (ui.marquee && e.pointerId === ui.marquee.pointerId) endMarquee()
     if (!ui.drag || e.pointerId !== ui.drag.pointerId) return
     endDrag()
   }, true)
@@ -709,8 +999,7 @@ export function install({ state, log }) {
     e.preventDefault()
     e.stopPropagation()
     ui.menu = { track: hit.track.id, index: hit.index }
-    ui.selected = { track: hit.track.id, index: hit.index }
-    paintSelection()
+    setSelection([selKey(hit.track.id, hit.index)])
     menu.hidden = false
     const box = menu.getBoundingClientRect()
     menu.style.left = `${clamp(e.clientX, 8, innerWidth - box.width - 12)}px`
@@ -727,9 +1016,19 @@ export function install({ state, log }) {
   })
 
   document.addEventListener('dblclick', (e) => {
+    // pointer capture on a move can retarget the compatibility dblclick to the
+    // clip, so fall back to what is actually under the pointer
     const wrap = e.target.closest?.('.clip-gain')
+      || document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.clip-gain')
     if (!wrap) return
-    const hit = pick(e)
+    let hit = pick(e)
+    if (!hit) {
+      const node = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('.clip')
+      const track = node ? trackOf(node.dataset.clip) : null
+      const index = Number(node?.dataset.regionIndex || 0)
+      const region = regionAt(track, index)
+      if (track && region && region.lengthBeats > 0) hit = { node, track, index, region }
+    }
     if (!hit) return
     e.preventDefault()
     e.stopPropagation()
@@ -812,6 +1111,32 @@ export function install({ state, log }) {
     mark(track)
   })
 
+  // ---------------------------------------------------------------- keyboard
+  function typing(el) {
+    if (!el) return false
+    const tag = String(el.tagName || '').toUpperCase()
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true
+  }
+
+  /* Capture, and registered before the roll editor's own keys: a clip
+     selection claims Escape and Delete so the take notes are not touched. */
+  document.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || typing(e.target)) return
+    if (e.key === 'Escape') {
+      if (!ui.sel.size) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      clearSelection()
+      return
+    }
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      if (!ui.sel.size) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      deleteSelection()
+    }
+  }, true)
+
   // ---------------------------------------------------------------- boot
   function addRenameItem() {
     if (menu.querySelector('[data-region="rename"]')) return
@@ -828,6 +1153,8 @@ export function install({ state, log }) {
   addRenameItem()
   paintLoop()
   syncLanes()
+  // edit.js installs after this module, so its undo stacks do not exist yet
+  setTimeout(hookUndo, 0)
 
   // renderTrackList() wipes #lane-rows; rebuild the clip layer whenever it does.
   // The per-row signature makes the observer settle after one extra pass.

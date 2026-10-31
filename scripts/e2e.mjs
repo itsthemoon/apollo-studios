@@ -240,9 +240,15 @@ async function main() {
   const pageUrl = APP
 
   // A restored autosave from an earlier run would make every later assertion
-  // depend on whatever that run left behind, so start from a blank browser.
+  // depend on whatever that run left behind, so start from a blank browser:
+  // the JSON slot and the take buffers in IndexedDB both go.
   runHarness(`
 emit(probe("localStorage.clear(); return 1"))
+emit(probe("return new Promise(function(res){"
+           " var q=indexedDB.open('apollo.takes');"
+           " q.onupgradeneeded=function(){var d=q.result; if(!d.objectStoreNames.contains('takes')) d.createObjectStore('takes',{keyPath:'id'})};"
+           " q.onsuccess=function(){var t=q.result.transaction('takes','readwrite'); t.objectStore('takes').clear(); t.oncomplete=function(){res('cleared')}};"
+           " q.onerror=function(){res('no idb')}; setTimeout(function(){res('timeout')}, 3000)})"))
 cdp("Page.navigate", session_id=SID, url=${JSON.stringify(APP)})
 wait_ready(8000)
 `)
@@ -264,7 +270,7 @@ emit(probe("return JSON.stringify({url:location.href,"
 
     step(2, 'Load demo renders a note take', `
 emit(click("#btn-demo"))
-time.sleep(1.6)  # real take: fetch + decode + pitch detect
+time.sleep(2.4)  # real take: fetch + decode + pitch detect
 emit(probe("return JSON.stringify({rows:document.querySelectorAll('#note-list .note').length,"
            " count:(document.getElementById('note-count')||{}).textContent||'',"
            " log:(document.getElementById('log')||{}).textContent||'',"
@@ -432,19 +438,21 @@ emit(probe("return JSON.stringify({readout:(document.getElementById('stem-readou
       }
     }
 
-    step(9, 'reload returns status to ready', `
+    step(9, 'reload restores the saved take and notes', `
 cdp("Page.navigate", session_id=SID, url=${JSON.stringify(APP)})
 loaded = wait_ready(8000)
-time.sleep(0.4)
+time.sleep(0.9)
 after = probe("return JSON.stringify({"
               " status:(document.getElementById('status')||{}).textContent||null,"
               " rows:document.querySelectorAll('#note-list .note').length,"
+              " take:window.VS.state.take?.length||0,"
+              " play:!document.getElementById('btn-play').disabled,"
               " presets:document.querySelectorAll('#preset-list button').length})")
 after["loaded"] = bool(loaded) and after.get("status") == "ready"
 emit(after)
-`, d => d.loaded && d.status === 'ready' && d.rows === 0 && d.presets >= 1
-      ? { pass: true, detail: `page reloaded, status "ready", take cleared (${d.rows} rows), ${d.presets} presets re-rendered` }
-      : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} presets=${d.presets}` })
+`, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
+      ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
+      : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
   } finally {
     closeTab()
     if (startedServer) startedServer.kill()

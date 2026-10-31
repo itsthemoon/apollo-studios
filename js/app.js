@@ -25,6 +25,8 @@ const $ = (id) => document.getElementById(id)
 const state = {
   notes: [],
   take: null,
+  takes: new Map(),
+  takeTrack: null,
   sampleRate: 48000,
   bands: [],
   selected: null,
@@ -246,6 +248,53 @@ function drawWave() {
   drawTake(canvas, state.take)
 }
 
+/* The take buffer is per track (`state.takes`); `state.take` stays the one that
+   plays and edits. Every code path that lands a buffer goes through here so the
+   per-track map cannot drift from the audible take. */
+function keepTake(take, rate, trackId) {
+  state.take = take
+  const id = trackId || state.takeTrack || state.tracks?.[0]?.id
+  if (id) {
+    state.takeTrack = id
+    state.takes.set(id, { data: take, rate: Number(rate) || state.sampleRate })
+  }
+  return take
+}
+
+/* Repaint one track's region 0 from its own buffer — a restore, not a record. */
+function paintTake(trackId) {
+  const track = state.tracks.find(t => t.id === trackId)
+  const entry = state.takes.get(trackId)
+  if (!track || !entry) return
+  if (track.id === state.tracks[0]?.id) { drawWave(); return }
+  const canvas = takeSurface(track)?.canvas
+  if (canvas) drawTake(canvas, entry.data)
+}
+
+/* persist.js hands a stored buffer back here: map, take, title, waveform. */
+function attachTake(trackId, data, rate) {
+  const buf = data instanceof Float32Array ? data : new Float32Array(data || 0)
+  if (!buf.length) return false
+  const r = Number(rate) || state.sampleRate
+  state.takes.set(trackId, { data: buf, rate: r })
+  if (!state.take?.length || trackId === state.takeTrack) {
+    state.take = buf
+    state.takeTrack = trackId
+    state.sampleRate = r
+  }
+  const secs = buf.length / r
+  const clip = trackId === state.tracks[0]?.id
+    ? document.getElementById('clip-1')
+    : document.querySelector(`.lane-row [data-clip="${trackId}"]`)
+  if (clip) {
+    clip.title = `${secs.toFixed(1)} s take`
+    clip.removeAttribute('data-full')
+  }
+  paintTake(trackId)
+  if (state.notes.length) $('btn-play').disabled = false
+  return true
+}
+
 function readMeter() {
   if (!state.take?.length) return
   const { report } = masterChain(stereoFrom(state.take), settings(), state.sampleRate)
@@ -412,7 +461,7 @@ async function toggleRecord() {
       return
     }
     state.sampleRate = rate
-    state.take = take
+    state.take = keepTake(take, rate, rec.track.id)
     state.selected = null
     state.demoDuration = null
     if (rec.track.id === state.tracks[0]?.id) $('proj-name').value = 'Take 1'
@@ -571,7 +620,7 @@ function applyCharacter() {
   if (!state.take?.length) throw new Error('nothing to process')
   const name = $('in-character').value
   const out = voicechar.applyCharacter(state.take, name, state.sampleRate)
-  state.take = out
+  keepTake(out, state.sampleRate)
   state.notes = pitch.detectNotes(out, state.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
   $('voice-state').textContent = name
@@ -632,7 +681,7 @@ function split() {
 function recombineStems() {
   if (!state.stems) throw new Error('no stems to recombine')
   const out = stems.recombine(state.stems)
-  state.take = out
+  keepTake(out, state.sampleRate)
   state.stems = null
   state.notes = pitch.detectNotes(out, state.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
@@ -658,7 +707,7 @@ function generateBeat() {
   for (let i = 0; i < rendered.length; i++) {
     mixed[i] = Math.max(-1, Math.min(1, mixed[i] + rendered[i] * 0.6))
   }
-  state.take = mixed
+  state.take = keepTake(mixed, state.sampleRate)
   state.notes = pitch.detectNotes(mixed, state.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
   resetHarmonies()
@@ -843,7 +892,7 @@ async function loadDemo() {
 
   state.sampleRate = buffer.sampleRate
   state.demoDuration = take.length / buffer.sampleRate
-  state.take = take
+  state.take = keepTake(take, buffer.sampleRate, state.tracks?.[0]?.id)
   // a recorded take sizes the region to itself; the demo take owns the lane
   const firstTrack = state.tracks?.[0]
   if (firstTrack?.clip) { firstTrack.clip.startBeat = 0; firstTrack.clip.lengthBeats = 4 }
@@ -1016,6 +1065,8 @@ function boot() {
     exportWav,
     loadDemo,
     autotune,
+    drawWave,
+    attachTake,
     harmonySet(name) {
       $('in-harmony').value = name
       buildHarmonies()

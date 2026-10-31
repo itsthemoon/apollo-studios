@@ -35,6 +35,17 @@ const NOTIFICATIONS = 6
 const AUTOSAVE_MS = 30_000
 const MAX_UNDO = 50
 
+/* Take audio is far too big for the localStorage slot (one 20 s stereo-ish
+   take is megabytes), so the samples live in IndexedDB beside the JSON. A
+   record is one track's buffer under a project key; a buffer over the take
+   limit is left out rather than filling the quota, and only the newest
+   KEEP_PROJECTS projects keep audio. */
+const TAKE_DB = 'apollo.takes'
+const TAKE_STORE = 'takes'
+const TAKE_DB_VERSION = 1
+const MAX_TAKE_BYTES = 40 * 1024 * 1024
+const KEEP_PROJECTS = 5
+
 const STYLES = `
 .ptag { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); margin-left: 6px;
   display: inline-flex; align-items: center; height: 20px; padding: 0 7px;
@@ -100,6 +111,8 @@ export function install({ state, log } = {}) {
   }
   state.tag = typeof state.tag === 'string' ? state.tag : 'skin'
   state.lyrics = Array.isArray(state.lyrics) ? state.lyrics : []
+  state.projectId = typeof state.projectId === 'string' && state.projectId ? state.projectId : newProjectId()
+  state.takes = state.takes instanceof Map ? state.takes : new Map()
 
   const bpm = () => Number($('in-bpm')?.value) || 96
   const secPerBeat = () => 60 / bpm()
@@ -237,6 +250,7 @@ export function install({ state, log } = {}) {
       format: FORMAT,
       schema: SCHEMA,
       at: new Date().toISOString(),
+      projectId: state.projectId,
       name: $('proj-name')?.value || 'untitled',
       tag: state.tag,
       tempo: bpm(),
@@ -244,6 +258,7 @@ export function install({ state, log } = {}) {
       key: { root: num(Number($('in-root')?.value), 0, 0, 11), scale: $('in-scale')?.value || 'chromatic' },
       quantize: $('in-quantize')?.checked === true,
       snapBeats: num(state.snapBeats, 0, 0, 4),
+      timesig: String(state.studio?.state?.timesig || '4/4'),
       tracks: clone(state.tracks),
       rolls: [...state.rolls].map(([id, r]) => [id, r ? roll.cloneRoll(r) : null]),
       patterns: [...state.patterns].map(([id, p]) => [id, clone(p)]),
@@ -296,6 +311,14 @@ export function install({ state, log } = {}) {
       const memberBox = $('in-member')
       if (memberBox) memberBox.checked = state.member
 
+      // audio lives in IndexedDB keyed by project; a swapped-in project must
+      // not inherit the old take while its own buffers load
+      state.projectId = typeof data.projectId === 'string' && /^[\w-]{1,64}$/.test(data.projectId) ? data.projectId : newProjectId()
+      state.takes = new Map()
+      state.take = null
+      state.takeTrack = null
+      state.tlSel?.clear?.()
+
       state.tracks = data.tracks.map((t, i) => normaliseTrack(t, i, state.member))
       state.active = state.tracks[0].id
 
@@ -337,6 +360,14 @@ export function install({ state, log } = {}) {
       if ($('proj-name')) $('proj-name').value = String(data.name || 'untitled').slice(0, 80)
       state.tag = String(data.tag || 'skin').slice(0, TAG_MAX)
       if ($('in-bpm')) $('in-bpm').value = String(num(Number(data.tempo), 96, 40, 220))
+      if (data.timesig && state.studio?.state) {
+        const ts = document.getElementById('in-timesig')
+        const sig = String(data.timesig)
+        if (ts && [...ts.options].some((o) => o.value === sig)) {
+          ts.value = sig
+          ts.dispatchEvent(new Event('change', { bubbles: true }))
+        }
+      }
       if ($('in-root') && data.key) $('in-root').value = String(num(Number(data.key.root), 0, 0, 11))
       if ($('in-scale') && data.key?.scale) {
         const option = [...$('in-scale').options].find((o) => o.value === data.key.scale)
@@ -367,6 +398,7 @@ export function install({ state, log } = {}) {
       if (Number.isFinite(Date.parse(data.at))) stamp(new Date(data.at))
       ui.dirty = false
       state.active = state.tracks[0].id
+      void restoreTakes(state.projectId)
     } finally {
       ui.restoring = false
     }
@@ -399,6 +431,194 @@ export function install({ state, log } = {}) {
     if ($('out-ap-strength')) $('out-ap-strength').textContent = `${Math.round(s.strength * 100)} %`
   }
 
+  // ---------------------------------------------------------------- take audio
+  // The JSON in the slot carries the arrangement; the samples go to IndexedDB
+  // under this project's key, one record per track. Everything here is
+  // best-effort: a browser that refuses IDB still saves the editable project.
+  let dbPromise = null
+
+  function openDb() {
+    if (dbPromise) return dbPromise
+    dbPromise = new Promise((resolve, reject) => {
+      if (typeof indexedDB === 'undefined') { reject(new Error('no indexedDB')); return }
+      const req = indexedDB.open(TAKE_DB, TAKE_DB_VERSION)
+      // another tab holding a blocked delete/upgrade can park open() forever
+      const timer = setTimeout(() => reject(new Error('indexedDB open timed out')), 4000)
+      req.onupgradeneeded = () => {
+        const d = req.result
+        const store = d.objectStoreNames.contains(TAKE_STORE)
+          ? req.transaction.objectStore(TAKE_STORE)
+          : d.createObjectStore(TAKE_STORE, { keyPath: 'id' })
+        if (!store.indexNames.contains('project')) store.createIndex('project', 'project')
+      }
+      req.onsuccess = () => { clearTimeout(timer); resolve(req.result) }
+      req.onerror = () => { clearTimeout(timer); reject(req.error || new Error('indexedDB open failed')) }
+      req.onblocked = () => { /* wait for the timeout, the request is still queued */ }
+    }).catch((err) => { dbPromise = null; throw err })
+    return dbPromise
+  }
+
+  async function inStore(mode, work) {
+    const d = await openDb()
+    return new Promise((resolve, reject) => {
+      const t = d.transaction(TAKE_STORE, mode)
+      const store = t.objectStore(TAKE_STORE)
+      let out
+      try { out = work(store) } catch (err) { reject(err); return }
+      t.oncomplete = () => resolve(out)
+      t.onerror = () => reject(t.error || new Error('take transaction failed'))
+      t.onabort = () => reject(t.error || new Error('take transaction aborted'))
+    })
+  }
+
+  function newProjectId() {
+    const raw = globalThis.crypto?.randomUUID?.() || `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`
+    return raw
+  }
+
+  // One record per track that actually carries a buffer. `state.takes` is the
+  // map app.js keeps; the single `state.take` is the fallback for a build that
+  // has not moved over.
+  function takeEntries() {
+    const out = []
+    if (state.takes instanceof Map && state.takes.size) {
+      for (const [trackId, entry] of state.takes) {
+        if (trackId && entry?.data?.length) out.push({ trackId, data: entry.data, rate: entry.rate })
+      }
+    } else if (state.take?.length) {
+      const trackId = state.takeTrack || state.tracks?.[0]?.id
+      if (trackId) out.push({ trackId, data: state.take, rate: state.sampleRate })
+    }
+    return out.filter((e) => state.tracks?.some((t) => t.id === e.trackId))
+  }
+
+  // Keep the newest KEEP_PROJECTS projects, never the one being written.
+  async function pruneTakes(keepKey) {
+    let rows
+    try {
+      rows = await inStore('readonly', (store) => {
+        const found = []
+        const req = store.openCursor()
+        req.onsuccess = () => {
+          const cursor = req.result
+          if (!cursor) return
+          found.push({ key: cursor.primaryKey, project: cursor.value?.project, at: Number(cursor.value?.at) || 0 })
+          cursor.continue()
+        }
+        return found
+      })
+    } catch { return 0 }
+    const newest = new Map()
+    for (const row of rows) {
+      if (!row.project) continue
+      newest.set(row.project, Math.max(newest.get(row.project) || 0, row.at))
+    }
+    const doomed = [...newest.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(KEEP_PROJECTS)
+      .map(([key]) => key)
+      .filter((key) => key !== keepKey)
+    if (!doomed.length) return 0
+    try {
+      await inStore('readwrite', (store) => {
+        for (const row of rows) if (doomed.includes(row.project)) store.delete(row.key)
+      })
+    } catch { return 0 }
+    return doomed.length
+  }
+
+  async function saveTakes(projectKey) {
+    if (!projectKey) return { saved: 0, bytes: 0, skipped: 0 }
+    const entries = takeEntries()
+    if (!entries.length) return { saved: 0, bytes: 0, skipped: 0 }
+    const kept = entries.filter((e) => e.data.byteLength <= MAX_TAKE_BYTES)
+    const skipped = entries.length - kept.length
+    for (const entry of entries) {
+      if (entry.data.byteLength > MAX_TAKE_BYTES) {
+        log(`take on ${trackName(entry.trackId)} is ${(entry.data.byteLength / 1048576).toFixed(1)} MB — over the 40 MB take limit, reload restores the previous take`)
+      }
+    }
+    if (!kept.length) { await pruneTakes(projectKey); return { saved: 0, bytes: 0, skipped } }
+    let bytes = 0
+    try {
+      await inStore('readwrite', (store) => {
+        const at = Date.now()
+        for (const entry of kept) {
+          const size = entry.data.byteLength
+          bytes += size
+          store.put({
+            id: `${projectKey}/${entry.trackId}`,
+            project: projectKey,
+            trackId: entry.trackId,
+            rate: Number(entry.rate) || state.sampleRate,
+            bytes: size,
+            at,
+            data: entry.data,
+          })
+        }
+      })
+    } catch (err) {
+      log(`take audio: store failed (${err?.message || err})`)
+      return { saved: 0, bytes: 0, skipped }
+    }
+    const pruned = await pruneTakes(projectKey)
+    if (pruned) log(`take audio: pruned ${pruned} older project${pruned === 1 ? '' : 's'}`)
+    return { saved: kept.length, bytes, skipped }
+  }
+
+  const trackName = (id) => state.tracks?.find((t) => t.id === id)?.name || id
+
+  async function loadTakes(projectKey) {
+    if (!projectKey) return []
+    try {
+      return await inStore('readonly', (store) => {
+        const found = []
+        const req = store.index('project').getAll(projectKey)
+        req.onsuccess = () => { if (Array.isArray(req.result)) found.push(...req.result) }
+        return found
+      })
+    } catch (err) {
+      log(`take audio: read failed (${err?.message || err})`)
+      return []
+    }
+  }
+
+  // Re-attach a restored buffer to its clip: the waveform, the play button and
+  // the note editor all hang off app.js, so it owns the repaint.
+  async function restoreTakes(projectKey) {
+    state.takes = new Map()
+    state.take = null
+    state.takeTrack = null
+    const rows = await loadTakes(projectKey)
+    if (!rows.length) return 0
+    let first = null
+    let bytes = 0
+    for (const row of rows) {
+      if (!row?.data?.length) continue
+      const track = state.tracks?.find((t) => t.id === row.trackId)
+      if (!track) continue
+      const data = row.data instanceof Float32Array ? row.data : new Float32Array(row.data)
+      const rate = Number(row.rate) || state.sampleRate
+      state.takes.set(track.id, { data, rate })
+      bytes += data.byteLength
+      if (!first) first = { id: track.id, data, rate }
+    }
+    if (!first) return 0
+    state.take = first.data
+    state.takeTrack = first.id
+    state.sampleRate = first.rate
+    for (const [id, entry] of state.takes) window.VS?.attachTake?.(id, entry.data, entry.rate)
+    if (state.notes.length) {
+      $('btn-play').disabled = false
+      window.VS?.setState?.({ notes: state.notes })
+    } else {
+      $('note-count').textContent = 'no notes'
+    }
+    log(`take audio restored: ${state.takes.size} track${state.takes.size === 1 ? '' : 's'}, ${(bytes / 1048576).toFixed(1)} MB`)
+    toast('Take audio restored from this browser', 'good')
+    return state.takes.size
+  }
+
   // ---------------------------------------------------------------- save
   function write(payload, { announce = true } = {}) {
     const text = JSON.stringify(payload)
@@ -417,6 +637,9 @@ export function install({ state, log } = {}) {
       log(`project is ${(text.length / 1024).toFixed(0)} kB — too big to store, export it instead`)
       if (announce) toast('Too big to store — use Export project file', 'bad', 4600)
     }
+    void saveTakes(payload.projectId).then(({ saved, bytes: audio }) => {
+      if (saved) log(`take audio stored: ${saved} track${saved === 1 ? '' : 's'}, ${(audio / 1048576).toFixed(1)} MB in this browser`)
+    })
     return { stored, bytes: text.length }
   }
 
@@ -649,6 +872,11 @@ export function install({ state, log } = {}) {
     state.notes = []
     state.versions = []
     state.lyrics = []
+    state.take = null
+    state.takeTrack = null
+    state.takes = new Map()
+    state.projectId = newProjectId()
+    window.VS?.drawWave?.()
     state.undoRoll = []
     state.edit?.undo?.splice?.(0)
     if ($('proj-name')) $('proj-name').value = 'untitled'
