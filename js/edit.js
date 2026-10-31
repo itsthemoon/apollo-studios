@@ -721,7 +721,10 @@ export function install({ state, log } = {}) {
         if (from.vibrato) n.vibrato = vibratoOf(from)
       })
     }
-    redraw()
+    // persist leaves the note list alone on a restore (the take is not stored),
+    // so only repaint the roll and the overlay instead of re-rendering the rows
+    paint()
+    state.studio?.drawRoll?.()
   }
 
   const readStored = () => {
