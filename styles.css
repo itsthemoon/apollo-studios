@@ -161,7 +161,7 @@ ul { padding-left: 18px; }
 .addtrack span { color: var(--cyan); }
 
 .track-head { flex: 0 0 var(--row-h); height: var(--row-h); margin: 2px 0 0; }
-.th-inner { height: 100%; background: rgba(194, 215, 242, 0.16); padding: 4px 8px;
+.th-inner { height: 100%; background: rgba(194, 215, 242, 0.16); padding: 4px 8px; overflow: hidden;
   display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--line); }
 .track-head.on .th-inner { box-shadow: inset 2px 0 0 var(--cyan); }
 .th-row { display: flex; align-items: center; gap: 6px; height: 20px; }
@@ -391,3 +391,8 @@ body:has(#note-list .note) .dropzone { display: none; }
 .sheet-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
 .sheet-head h2 { flex: 1; font-size: 15px; font-weight: 600; }
 .perks { font-size: 12.5px; color: var(--mute); line-height: 1.9; }
+
+.th-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.th-spacer { flex: 1 1 0; min-width: 0; }
+.fx-count { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; }
+.panwrap { margin-left: auto; flex: 0 0 46px; }

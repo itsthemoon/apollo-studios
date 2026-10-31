@@ -360,3 +360,55 @@ body.counting .rec-dot { animation: none; }
 .clip[data-recording] { border-color: var(--red-hot); min-width: 0; }
 .clip[data-recording] .clip-head h3::after { content: ' REC'; color: var(--red-hot); font-size: 9px; letter-spacing: 0.08em; }
 .clip canvas.wave { display: block; width: 100%; height: calc(100% - 18px); }
+
+/* ------------------------------------------------------------ rail collapse */
+.body { position: relative; }
+.rail-toggle { margin-left: auto; flex: 0 0 auto; }
+.rail-toggle svg { width: 12px; height: 12px; transform: rotate(180deg); transition: transform 0.16s ease; }
+body.rail-collapsed .rail-toggle svg { transform: rotate(0deg); }
+body.rail-collapsed { --rail-w: 44px; }
+body.rail-collapsed .rail { width: 44px; flex: 0 0 44px; overflow-x: hidden; }
+body.rail-collapsed .rail-head { flex-direction: column; height: auto; flex: 0 0 auto; gap: 3px; padding: 6px 0; }
+body.rail-collapsed .addtrack { width: 28px; height: 28px; padding: 0; justify-content: center; font-size: 0; }
+body.rail-collapsed .rail-head .ic { width: 28px; height: 28px; }
+body.rail-collapsed .track-head { flex: 0 0 auto; height: auto; }
+body.rail-collapsed .th-inner { padding: 3px 0; align-items: center; }
+body.rail-collapsed .th-row { justify-content: center; flex-wrap: wrap; height: auto; gap: 2px; padding: 1px 0; }
+body.rail-collapsed .tname,
+body.rail-collapsed .tnum,
+body.rail-collapsed .fx-count,
+body.rail-collapsed .th-vol-read,
+body.rail-collapsed .th-meter,
+body.rail-collapsed .panwrap,
+body.rail-collapsed .th-spacer,
+body.rail-collapsed .chev { display: none; }
+body.rail-collapsed .th-vol { flex: 0 0 30px; }
+body.rail-collapsed .rail-row { justify-content: center; padding: 0; }
+body.rail-collapsed .rail-row > span:not(.ic),
+body.rail-collapsed .rail-row .ai { display: none; }
+body.rail-collapsed .rail-state { display: none; }
+
+/* the "more" pill only exists while the rail actually overflows */
+.rail-more { position: absolute; left: 10px; bottom: 8px; z-index: 8; height: 20px; padding: 0 9px;
+  border-radius: 9999px; border: 1px solid var(--line-hi); background: rgba(10, 14, 16, 0.94);
+  color: var(--dim); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.rail-more[hidden] { display: none; }
+.rail-more:hover { color: var(--text); }
+body.rail-collapsed .rail-more { left: 3px; right: 3px; padding: 0; font-size: 8px; }
+
+/* ------------------------------------------------------------------- meter */
+select.ts { background: var(--panel); border: 1px solid var(--line); border-radius: 5px; height: 22px;
+  font-size: 11px; color: var(--text); padding: 0 3px; font-variant-numeric: tabular-nums; cursor: pointer; }
+select.ts:hover { border-color: var(--line-hi); }
+
+/* -------------------------------------------------------------- tab overflow */
+.sb.more { display: none; align-items: center; justify-content: center; width: 26px; height: 24px;
+  border-radius: 6px; color: var(--mute); }
+.sb.more svg { width: 15px; height: 15px; }
+.sb.more:hover { color: var(--text); }
+.sb.more[aria-expanded="true"] { color: var(--ink); background: var(--pill-hi); }
+@media (max-width: 1399px) {
+  .tabbar-right { gap: 10px; }
+  .tabbar-right .sb { display: none; }
+  .tabbar-right .sb.more { display: inline-flex; }
+}

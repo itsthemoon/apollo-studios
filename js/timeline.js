@@ -187,7 +187,7 @@ export function install({ state, log }) {
     if (!node.querySelector('.clip-head')) {
       const head = document.createElement('div')
       head.className = 'clip-head'
-      head.innerHTML = '<h3></h3><span class="clip-gain">gain <output>0.0 dB</output></span>'
+      head.innerHTML = `<h3>${track.name}</h3><span class="clip-gain">gain <output>0.0 dB</output></span>`
       node.prepend(head)
     }
     node.setAttribute('role', 'group')

@@ -31,6 +31,14 @@ const noteName = (midi) => {
   return `${NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`
 }
 const signed = (c) => `${c > 0 ? '+' : ''}${c}c`
+/* Per-note character, both stored on the note next to its cents: formant is a
+   semitone shift of the vocal body (not the pitch), vibrato is the depth of a
+   5.5 Hz wobble in percent. */
+const FORMANT_LIMIT = 12
+const VIBRATO_LIMIT = 100
+const formantOf = (n) => clamp(Math.round(Number(n.formant) || 0), -FORMANT_LIMIT, FORMANT_LIMIT)
+const vibratoOf = (n) => clamp(Math.round(Number(n.vibrato) || 0), 0, VIBRATO_LIMIT)
+const stRead = (v) => `${v > 0 ? '+' : ''}${v} st`
 
 const STYLES = `
 #roll { touch-action: none; }
@@ -43,6 +51,18 @@ body.edit-dragging #roll { cursor: grabbing; }
   font: 11px/1.3 ui-monospace, Menlo, monospace; white-space: nowrap; }
 .roll-wrap .edit-marquee { position: absolute; z-index: 4; pointer-events: none;
   border: 1px dashed rgba(0, 198, 209, 0.9); background: rgba(0, 198, 209, 0.1); }
+.roll-wrap .note-insp { position: absolute; left: 10px; bottom: 10px; z-index: 6; width: 210px;
+  display: grid; gap: 5px; padding: 7px 9px 8px; border-radius: 8px;
+  border: 1px solid #24343a; background: rgba(6, 12, 14, 0.94); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  font: 10px/1.2 ui-monospace, Menlo, monospace; color: #9fb4ba; }
+.roll-wrap .note-insp[hidden] { display: none; }
+.roll-wrap .note-insp .ni-head { display: flex; align-items: baseline; gap: 6px; }
+.roll-wrap .note-insp .ni-head b { font-size: 10px; font-weight: 600; color: #d6f6f8; letter-spacing: 0.04em; }
+.roll-wrap .note-insp .ni-head span { margin-left: auto; color: #f5b800; }
+.roll-wrap .note-insp label { display: grid; grid-template-columns: 52px 1fr 34px; align-items: center; gap: 5px; }
+.roll-wrap .note-insp input { width: 100%; height: 3px; accent-color: var(--gold, #f5b800); }
+.roll-wrap .note-insp output { text-align: right; color: #d6f6f8; font-variant-numeric: tabular-nums; }
+.roll-wrap .note-insp .ni-hint { color: #5d7076; font-size: 9px; }
 `
 
 export function install({ state, log } = {}) {
@@ -69,7 +89,16 @@ export function install({ state, log } = {}) {
   const band = document.createElement('div')
   band.className = 'edit-marquee'
   band.hidden = true
-  wrap.append(overlay, ghost, band)
+  const insp = document.createElement('div')
+  insp.className = 'note-insp'
+  insp.hidden = true
+  insp.setAttribute('role', 'group')
+  insp.setAttribute('aria-label', 'Note character')
+  insp.innerHTML = `<div class="ni-head"><b>CHARACTER</b><span id="ni-name">—</span></div>
+    <label>Formant <input id="in-note-formant" type="range" min="-12" max="12" step="1" value="0" aria-label="Formant"><output id="out-note-formant">0 st</output></label>
+    <label>Vibrato <input id="in-note-vibrato" type="range" min="0" max="100" step="1" value="0" aria-label="Vibrato"><output id="out-note-vibrato">0 %</output></label>
+    <span class="ni-hint">[ ] formant · ; ' vibrato</span>`
+  wrap.append(overlay, ghost, band, insp)
 
   // ---------------------------------------------------------------- model
   const kind = () => (state.rolls?.get(state.active) ? 'roll' : 'voice')
@@ -79,6 +108,8 @@ export function install({ state, log } = {}) {
     const v = Number($('in-quant')?.value)
     return Number.isFinite(v) && v > 0 ? v : 0.25
   }
+  // pitch target from studio's snap(): the key at the snap strength
+  const snapPitch = (midi) => (state.studio?.snapPitch ? state.studio.snapPitch(midi) : midi)
   const eid = (n) => (n._eid ?? (n._eid = `v${(ui.eid += 1)}`))
   const keyOf = (n, k = kind()) => (k === 'roll' ? `r:${n.id}` : `v:${eid(n)}`)
   const startBeatOf = (n, k) => (k === 'voice' ? n.start / secPerBeat() : n.start)
@@ -99,6 +130,54 @@ export function install({ state, log } = {}) {
     if (kind() !== 'voice' || !ui.primary) { state.selected = null; return }
     const i = state.notes.findIndex((n) => keyOf(n) === ui.primary)
     state.selected = i >= 0 ? i : null
+  }
+
+  // ---------------------------------------------------------------- character
+  const primNote = () => collect().find((n) => keyOf(n) === ui.primary) || collect()[0] || null
+
+  /* The inspector mirrors the primary note and writes to the whole selection;
+     it hides the moment nothing is selected. */
+  function paintInspector() {
+    const note = primNote()
+    if (!note) { insp.hidden = true; return }
+    insp.hidden = false
+    $('ni-name').textContent = noteName(note.midi)
+    const f = formantOf(note)
+    const v = vibratoOf(note)
+    if (document.activeElement !== $('in-note-formant')) $('in-note-formant').value = String(f)
+    if (document.activeElement !== $('in-note-vibrato')) $('in-note-vibrato').value = String(v)
+    $('out-note-formant').textContent = stRead(f)
+    $('out-note-vibrato').textContent = `${v} %`
+  }
+
+  const gesture = { open: false }
+  function beginFxEdit() {
+    if (gesture.open || !collect().length) return
+    pushUndo(snapshot())
+    gesture.open = true
+  }
+
+  function setFx(field, value) {
+    const notes = collect()
+    if (!notes.length) return
+    for (const note of notes) {
+      if (field === 'formant') note.formant = clamp(Math.round(value), -FORMANT_LIMIT, FORMANT_LIMIT)
+      else note.vibrato = clamp(Math.round(value), 0, VIBRATO_LIMIT)
+    }
+    const first = notes[0]
+    log(field === 'formant'
+      ? `formant ${stRead(formantOf(first))}: ${noteName(first.midi)}`
+      : `vibrato ${vibratoOf(first)}%: ${noteName(first.midi)}`)
+    paint()
+  }
+
+  function nudgeFx(field, delta) {
+    const notes = collect()
+    if (!notes.length) return
+    const base = notes[0]
+    pushUndo(snapshot())
+    gesture.open = false
+    setFx(field, (field === 'formant' ? formantOf(base) : vibratoOf(base)) + delta)
   }
 
   // ---------------------------------------------------------------- snapshots
@@ -199,8 +278,21 @@ export function install({ state, log } = {}) {
       g.strokeStyle = 'rgba(0, 220, 233, 1)'
       g.lineWidth = 1.5
       g.strokeRect(Math.round(rc.x) + 0.5, Math.round(rc.y) + 0.5, Math.max(1, Math.round(rc.w) - 1), Math.max(1, Math.round(rc.h) - 1))
+      // the character dot: left/right is formant, size is vibrato depth
+      const f = formantOf(note)
+      const v = vibratoOf(note)
+      if (f || v) {
+        const cx = rc.x + 4 + ((f + FORMANT_LIMIT) / (FORMANT_LIMIT * 2)) * Math.max(0, rc.w - 8)
+        const cy = rc.y + Math.max(3, rc.h / 2)
+        g.beginPath()
+        g.arc(cx, cy, 1.6 + (v / VIBRATO_LIMIT) * 2.2, 0, Math.PI * 2)
+        g.fillStyle = `rgba(245, 184, 0, ${(0.5 + v / 220).toFixed(2)})`
+        g.fill()
+      }
     }
+    paintInspector()
   }
+  ui.paint = paint
 
   function showGhostAt(left, top, note) {
     const c = kind() === 'voice' ? centsOf((note.midi - Math.round(note.midi)) * 100) : centsOf(note.cents)
@@ -372,7 +464,8 @@ export function install({ state, log } = {}) {
     const midiHi = b.low + b.rows - 1 + (drag.kind === 'voice' ? 0.49 : 0)
     for (const item of drag.items) {
       setStart(item.note, clamp(item.startBeat + beatDelta, 0, Math.max(0.05, b.beats - item.durBeat)), drag.kind)
-      setMidi(item.note, clamp(item.midi + midiDelta, midiLo, midiHi), drag.kind)
+      const raw = clamp(item.midi + midiDelta, midiLo, midiHi)
+      setMidi(item.note, e.altKey ? raw : snapPitch(raw), drag.kind)
     }
     document.body.classList.add('edit-dragging')
     showGhostAt(e.clientX - box.left, e.clientY - box.top, drag.items[0].note)
@@ -447,7 +540,7 @@ export function install({ state, log } = {}) {
     const k = kind()
     const step = grid()
     const startBeat = clamp(Math.round(p.beat / step) * step, 0, Math.max(0.05, b.beats - 0.5))
-    const midi = clamp(p.midi, b.low, b.low + b.rows - 1)
+    const midi = clamp(Math.round(snapPitch(p.midi)), b.low, b.low + b.rows - 1)
     pushUndo(snapshot())
     let added
     if (k === 'roll') {
@@ -459,6 +552,8 @@ export function install({ state, log } = {}) {
     }
     setSel(new Set([keyOf(added, k)]))
     ui.primary = keyOf(added, k)
+    added.formant = 0
+    added.vibrato = 0
     redraw()
     log(`added ${noteName(midi)} at beat ${startBeat.toFixed(2)}`)
   }
@@ -532,6 +627,20 @@ export function install({ state, log } = {}) {
       clearSelection()
       return
     }
+    if (e.key === '[' || e.key === ']') {
+      if (!collect().length) return
+      e.preventDefault()
+      e.stopPropagation()
+      nudgeFx('formant', e.key === '[' ? -1 : 1)
+      return
+    }
+    if (e.key === ';' || e.key === "'" || e.key === '"') {
+      if (!collect().length) return
+      e.preventDefault()
+      e.stopPropagation()
+      nudgeFx('vibrato', e.key === ';' ? -5 : 5)
+      return
+    }
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       if (!collect().length) return
       e.preventDefault()
@@ -574,6 +683,71 @@ export function install({ state, log } = {}) {
 
   $('btn-undo')?.addEventListener('click', () => undo())
   $('btn-redo')?.addEventListener('click', () => redo())
+
+  // character sliders: one undo entry per gesture, not per pixel
+  $('in-note-formant').addEventListener('pointerdown', beginFxEdit)
+  $('in-note-vibrato').addEventListener('pointerdown', beginFxEdit)
+  $('in-note-formant').addEventListener('input', (e) => { beginFxEdit(); setFx('formant', Number(e.target.value)) })
+  $('in-note-vibrato').addEventListener('input', (e) => { beginFxEdit(); setFx('vibrato', Number(e.target.value)) })
+  for (const id of ['in-note-formant', 'in-note-vibrato']) {
+    $(id).addEventListener('change', () => { gesture.open = false })
+  }
+  document.addEventListener('pointerup', () => { gesture.open = false }, true)
+
+  // ---------------------------------------------------------------- persistence
+  // persist.js rebuilds roll notes field by field, so formant and vibrato ride
+  // the saved JSON yet have to be re-attached after a load. Nothing in that file
+  // changes: the stored payload is read back here and matched onto fresh notes.
+  const SLOT = 'apollo.project.v1'
+  const fxKey = (n) => `${Math.round(n.midi)}|${(Number(n.start) || 0).toFixed(3)}`
+
+  function graftFx(data) {
+    if (!data || typeof data !== 'object') return
+    const take = new Map((Array.isArray(data.notes) ? data.notes : []).map((n) => [fxKey(n), n]))
+    state.notes.forEach((n) => {
+      const src = take.get(fxKey(n))
+      if (!src) return
+      if (src.formant) n.formant = formantOf(src)
+      if (src.vibrato) n.vibrato = vibratoOf(src)
+    })
+    for (const [id, r] of data.rolls || []) {
+      const target = state.rolls.get(id)
+      if (!target || !Array.isArray(r?.notes)) continue
+      const src = new Map(r.notes.map((n) => [fxKey(n), n]))
+      target.notes.forEach((n) => {
+        const from = src.get(fxKey(n))
+        if (!from) return
+        if (from.formant) n.formant = formantOf(from)
+        if (from.vibrato) n.vibrato = vibratoOf(from)
+      })
+    }
+    redraw()
+  }
+
+  const readStored = () => {
+    try { return JSON.parse(localStorage.getItem(SLOT) || 'null') } catch { return null }
+  }
+
+  function wrapLoad() {
+    const api = state.persist
+    if (!api || api.fxGraft) return
+    api.fxGraft = true
+    const openFile = api.openFile
+    api.openFile = async (file) => {
+      const out = await openFile?.(file)
+      try { graftFx(JSON.parse(await file.text())) } catch { /* not our file */ }
+      return out
+    }
+  }
+  // the menu's own "Open saved project" item calls persist's private restore, so
+  // catch the click and graft once its synchronous apply has landed
+  document.addEventListener('click', (e) => {
+    const item = e.target.closest?.('#menu-app [role="menuitem"]')
+    if (!item || !/open saved project/i.test(item.textContent)) return
+    setTimeout(() => graftFx(readStored()), 0)
+  }, true)
+  // boot restore has already run by the time this fires
+  setTimeout(() => { wrapLoad(); graftFx(readStored()) }, 0)
 
   window.addEventListener('resize', () => paint())
   if (state.selected != null) {

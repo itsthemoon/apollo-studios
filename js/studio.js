@@ -14,9 +14,24 @@ import * as autopitch from './autopitch.js'
 import * as shortcuts from './shortcuts.js'
 import * as fx from './fx.js'
 import * as roll from './roll.js'
+import * as tune from './tune.js'
 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const $ = (id) => document.getElementById(id)
+
+/* Bar lengths, counted in quarter notes (6/8 is six eighths = three quarters),
+   so the ruler groups bars, the metronome accents bar 1 and the snap grid can
+   offer "bar" as a real unit at any meter. */
+const TIME_SIGS = { '2/4': 2, '3/4': 3, '4/4': 4, '6/8': 3 }
+const BASE_BPM = 120
+const RAIL_KEY = 'apollo.rail'
+const TIMESIG_KEY = 'apollo.timesig'
+const TAB_QUERY = '(max-width: 1399px)'
+
+const readStore = (key, fallback = '') => {
+  try { return localStorage.getItem(key) ?? fallback } catch { return fallback }
+}
+const writeStore = (key, value) => { try { localStorage.setItem(key, value) } catch { /* private mode */ } }
 
 export function attach(app) {
   const state = app.state
@@ -42,6 +57,10 @@ export function attach(app) {
   state.snapBeats = 1
   state.zoom = 77
   state.stretch = false
+  // the meter is a real project setting: it drives the ruler, the metronome
+  // accent, the roll's bar lines and the bar-length grid targets
+  state.timesig = TIME_SIGS[readStore(TIMESIG_KEY)] ? readStore(TIMESIG_KEY) : '4/4'
+  state.key = { root: Number($('in-root')?.value) || 0, scale: $('in-scale')?.value || 'chromatic' }
   /* transport clock: one object so the meter engine can read it before the
      transport section below has added its listeners */
   const transport = {
@@ -116,6 +135,153 @@ export function attach(app) {
   })
   $('m-addtrack').addEventListener('click', (e) => { if (e.target === $('m-addtrack')) closeModal($('m-addtrack')) })
 
+  // ---------------------------------------------------------------- chrome: rail + tab overflow
+  // These build themselves here, above the panel wiring, so the delegated
+  // [data-panel-open] / [data-drawer] binders below also cover the copies.
+  const rail = document.querySelector('.rail')
+
+  function paintRail() {
+    const collapsed = document.body.classList.contains('rail-collapsed')
+    const btn = $('btn-rail-collapse')
+    if (btn) {
+      btn.setAttribute('aria-expanded', String(!collapsed))
+      btn.setAttribute('aria-label', collapsed ? 'Expand the track rail' : 'Collapse the track rail')
+      btn.title = collapsed ? 'Expand the rail' : 'Collapse the rail'
+    }
+    paintRailMore()
+  }
+
+  /* the fade pill is only honest while there is more rail below the fold */
+  function paintRailMore() {
+    const tip = $('rail-more')
+    if (!tip || !rail) return
+    tip.hidden = rail.scrollHeight - rail.clientHeight <= 4
+  }
+
+  function setRail(collapsed) {
+    document.body.classList.toggle('rail-collapsed', collapsed)
+    writeStore(RAIL_KEY, collapsed ? 'collapsed' : 'open')
+    paintRail()
+    // the arrange column just changed width: rebuild the ruler on the new one
+    requestAnimationFrame(() => { rebuildRuler(); laneSpan(); state.studio?.drawRoll?.() })
+  }
+
+  if (rail) {
+    rail.id = 'rail'
+    const head = rail.querySelector('.rail-head')
+    const toggle = document.createElement('button')
+    toggle.id = 'btn-rail-collapse'
+    toggle.className = 'ic rail-toggle'
+    toggle.type = 'button'
+    toggle.setAttribute('aria-controls', 'rail')
+    toggle.setAttribute('aria-expanded', 'true')
+    toggle.setAttribute('aria-label', 'Collapse the track rail')
+    toggle.innerHTML = '<span data-icon="chevron" aria-hidden="true"></span>'
+    head?.append(toggle)
+    toggle.addEventListener('click', () => setRail(!document.body.classList.contains('rail-collapsed')))
+
+    const tip = document.createElement('button')
+    tip.id = 'rail-more'
+    tip.className = 'rail-more'
+    tip.type = 'button'
+    tip.hidden = true
+    tip.textContent = 'more ⌄'
+    tip.setAttribute('aria-label', 'Scroll the track rail')
+    tip.addEventListener('click', () => rail.scrollBy({ top: rail.clientHeight * 0.7, behavior: 'smooth' }))
+    document.querySelector('.body')?.append(tip)
+
+    rail.addEventListener('scroll', paintRailMore, { passive: true })
+    if (typeof ResizeObserver === 'function') new ResizeObserver(paintRailMore).observe(rail)
+    new MutationObserver(paintRailMore).observe(rail, { childList: true, subtree: true })
+    if (readStore(RAIL_KEY) === 'collapsed') document.body.classList.add('rail-collapsed')
+    paintRail()
+  }
+
+  /* Below 1400 px the right-hand tab cluster is hidden by CSS and this menu
+     stands in for it, item for item, so every panel stays one tab away. */
+  const tabRight = document.querySelector('.tabbar-right')
+  const tabMore = document.createElement('button')
+  const tabMenu = document.createElement('div')
+  if (tabRight) {
+    const items = [...tabRight.querySelectorAll('.sb')]
+    tabMore.id = 'btn-tab-more'
+    tabMore.className = 'sb more'
+    tabMore.type = 'button'
+    tabMore.setAttribute('aria-haspopup', 'menu')
+    tabMore.setAttribute('aria-expanded', 'false')
+    tabMore.setAttribute('aria-controls', 'menu-tabbar')
+    tabMore.setAttribute('aria-label', 'More panels and actions')
+    tabMore.innerHTML = '<span data-icon="dots-h" aria-hidden="true"></span>'
+    items[items.length - 1]?.after(tabMore)
+    tabRight.insertBefore(tabMore, $('status'))
+
+    tabMenu.id = 'menu-tabbar'
+    tabMenu.className = 'menu'
+    tabMenu.setAttribute('role', 'menu')
+    tabMenu.setAttribute('aria-labelledby', 'btn-tab-more')
+    tabMenu.hidden = true
+    items.forEach((src) => {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.setAttribute('role', 'menuitem')
+      for (const attr of ['data-panel-open', 'data-drawer', 'data-modal']) {
+        if (src.getAttribute(attr)) b.setAttribute(attr, src.getAttribute(attr))
+      }
+      // a copy cannot inherit an element-bound listener, so id-only items
+      // (the mixer) replay their original button instead
+      if (src.id) b.dataset.replay = src.id
+      b.innerHTML = src.innerHTML
+      b.setAttribute('aria-label', src.textContent.trim())
+      b.addEventListener('click', () => closeTabMenu(true))
+      tabMenu.append(b)
+    })
+    document.body.append(tabMenu)
+
+    tabMore.addEventListener('click', (e) => {
+      e.stopPropagation()
+      if (!tabMenu.hidden) { closeTabMenu(true); return }
+      tabMenu.hidden = false
+      tabMore.setAttribute('aria-expanded', 'true')
+      const r = tabMore.getBoundingClientRect()
+      const box = tabMenu.getBoundingClientRect()
+      tabMenu.style.left = `${Math.max(8, Math.min(r.right - box.width, innerWidth - box.width - 12))}px`
+      tabMenu.style.top = `${Math.min(r.top - box.height - 8, innerHeight - box.height - 12)}px`
+      tabMenu.querySelector('[role="menuitem"]')?.focus()
+    })
+    tabMenu.addEventListener('click', (e) => {
+      const item = e.target.closest('[data-replay]')
+      if (item) $(item.dataset.replay)?.click()
+    })
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#menu-tabbar, #btn-tab-more')) return
+      if (!tabMenu.hidden) closeTabMenu(false)
+    })
+    /* Capture phase: the editor's own Escape (clear the note selection) also
+       listens on document capture and would otherwise eat the key first. */
+    document.addEventListener('keydown', (e) => {
+      if (tabMore.getAttribute('aria-expanded') !== 'true') return
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        e.stopPropagation()
+        closeTabMenu(true)
+        return
+      }
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+      e.preventDefault()
+      e.stopPropagation()
+      const all = [...tabMenu.querySelectorAll('[role="menuitem"]')]
+      const at = all.indexOf(document.activeElement)
+      all[(at + (e.key === 'ArrowDown' ? 1 : all.length - 1)) % all.length]?.focus()
+    }, true)
+  }
+
+  function closeTabMenu(refocus) {
+    const wasOpen = !tabMenu.hidden
+    tabMenu.hidden = true
+    tabMore.setAttribute('aria-expanded', 'false')
+    if (refocus && wasOpen) tabMore.focus()
+  }
+
   // ---------------------------------------------------------------- panels
   document.querySelectorAll('[data-panel-open]').forEach((el) => {
     el.addEventListener('click', (e) => { e.preventDefault(); app.openPanel(el.dataset.panelOpen.replace('p-', '')) })
@@ -136,6 +302,7 @@ export function attach(app) {
       box.dataset.track = t.id
       const info = tracks.typeInfo(t.type)
       box.innerHTML = `
+        <div class="th-inner">
         <div class="th-row">
           <span class="colour" data-colour="${t.color}" aria-hidden="true"></span>
           <span class="ticon" aria-hidden="true" data-icon="${info.icon}"></span>
@@ -151,12 +318,13 @@ export function attach(app) {
           <button class="fx" type="button" aria-label="Add a plug-in" data-fx="${t.id}">+ Fx</button>
           <span class="fx-count" data-fx-count="${t.id}">${t.chain.effects.length ? t.chain.effects.length + ' effects' : 'no effects'}</span>
           <span class="th-spacer"></span>
-          <label class="panwrap" title="Pan"><input class="panin" type="range" min="-100" max="100" value="${t.pan * 100}" aria-label="Pan ${t.name}" data-pan="${t.id}"></label>
         </div>
         <div class="th-row vol-row">
           <input class="th-vol" type="range" min="-60" max="6" value="${t.volumeDb}" step="0.5" aria-label="${t.name} volume" data-vol="${t.id}">
           <span class="th-vol-read" data-vol-read="${t.id}">${t.volumeDb.toFixed(1)} dB</span>
           <span class="th-meter" aria-hidden="true"><i></i></span>
+          <label class="panwrap" title="Pan"><input class="panin" type="range" min="-100" max="100" value="${t.pan * 100}" aria-label="Pan ${t.name}" data-pan="${t.id}"></label>
+        </div>
         </div>
         `
       host.append(box)
@@ -169,7 +337,8 @@ export function attach(app) {
         : t.type === 'drums' ? 'pattern' : 'region'
       row.innerHTML = `<div class="ghost-clip" data-ghost="${t.id}">
           ${t.type === 'instrument' ? '<canvas class="mini-roll" width="220" height="96"></canvas>' : ''}
-          <span>${label}</span></div>
+          <div class="clip-head"><h3>${t.name}</h3><span class="gain">${t.volumeDb.toFixed(1)} dB</span></div>
+          <span class="ghost-count">${label}</span></div>
         <div class="automation-lane" data-automation="${t.id}" hidden>
         <canvas class="auto-canvas" width="240" height="46" role="img" aria-label="Volume automation for ${t.name}"></canvas>
         <span class="auto-legend">vol <button class="ic mini" type="button" data-auto-param="${t.id}:pan">pan</button></span></div>`
@@ -613,15 +782,20 @@ export function attach(app) {
     const rowH = H / rows
     const gut = opts.preview ? 0 : 26
     const beatW = (W - gut) / r.lengthBeats
+    const keyPcs = scalePcs()
     for (let row = 0; row < rows; row++) {
       const midi = r.lowMidi + (rows - 1 - row)
-      g.fillStyle = [1, 3, 6, 8, 10].includes(midi % 12) ? '#0a0e10' : '#0d1315'
+      const pc = ((midi % 12) + 12) % 12
+      const black = [1, 3, 6, 8, 10].includes(pc)
+      // in-key rows carry a faint lift so the key's target is visible in the grid
+      g.fillStyle = black ? '#0a0e10' : '#0d1315'
+      if (keyPcs.has(pc)) g.fillStyle = black ? '#111a1d' : '#121b1e'
       g.fillRect(gut, row * rowH, W - gut, rowH)
       g.fillStyle = '#1b2225'
       g.fillRect(gut, row * rowH + rowH - 1, W - gut, 1)
     }
     for (let b = 0; b <= r.lengthBeats; b += 1) {
-      g.fillStyle = b % 4 === 0 ? '#243034' : '#192124'
+      g.fillStyle = b % barBeats() === 0 ? '#243034' : '#192124'
       g.fillRect(gut + b * beatW, 0, 1, H)
     }
     r.notes.forEach((n) => {
@@ -1161,26 +1335,70 @@ export function attach(app) {
   })
 
   const clamp01 = (v) => Math.min(1, Math.max(0, Number.isFinite(v) ? v : 0))
+  const barBeats = () => TIME_SIGS[state.timesig] || 4
+
+  /* Pitch classes the active key calls in-scale. `snap()`'s pitch half and the
+     roll's row tint read this, so changing the key moves the target. */
+  function scalePcs() {
+    const scale = $('in-scale')?.value || 'chromatic'
+    const root = Number($('in-root')?.value) || 0
+    const offsets = tune.SCALES[scale] || tune.SCALES.chromatic
+    return new Set(offsets.map((i) => (((i + root) % 12) + 12) % 12))
+  }
+  /* Pitch snap: pulls toward the key by the snap strength. A chromatic key or a
+     zero strength is the identity, exactly like the beat grid's Off. */
+  function snapPitch(midi, strength = Number($('in-snap').value) / 100) {
+    const n = Number(midi)
+    if (!Number.isFinite(n)) return 0
+    const amount = clamp01(strength)
+    const scale = $('in-scale')?.value || 'chromatic'
+    if (amount <= 0 || scale === 'chromatic') return n
+    const root = Number($('in-root')?.value) || 0
+    return n + (tune.nearestInScale(n, root, scale) - n) * amount
+  }
   /* Blend the raw position toward the division by the strength slider. Off (or
-     a zero strength) is the identity, so nothing is nudged. */
+     a zero strength) is the identity, so nothing is nudged. A division of a bar
+     or more follows the time signature instead of the fixed four beats. */
   function snap(beats, strength = Number($('in-snap').value) / 100) {
     const n = Number(beats)
     if (!Number.isFinite(n)) return 0
-    const div = state.snapBeats
+    const div = state.snapBeats >= 4 ? barBeats() : state.snapBeats
     const amount = clamp01(strength)
     if (!div || div <= 0 || amount <= 0) return n
     return n + (Math.round(n / div) * div - n) * amount
   }
 
+  /* The beat pixel scale is derived: zoom is pixels per 4/4 bar at 120 bpm, the
+     tempo stretches or compresses that, and a bar is as wide as the meter says.
+     Both --bar and --ppb carry the bar width (app.js and timeline.js map clicks
+     through those), --beat carries the subdivision the lane grid draws. */
   const bpmNow = () => Number($('in-bpm').value) || 96
-  const barPx = () => {
-    const v = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar'))
-    return Number.isFinite(v) && v > 0 ? v : state.zoom
-  }
-  const pxPerBeat = () => barPx() / 4
+  const pxPerBeat = () => (state.zoom / 4) * (bpmNow() / BASE_BPM)
+  const barPx = () => pxPerBeat() * barBeats()
   const beatsOf = (px) => px / pxPerBeat()
   const pxOf = (beats) => beats * pxPerBeat()
   const playheadBeats = () => Math.max(0, state.playhead * bpmNow() / 60)
+
+  /* Re-derive every pixel from the current tempo, meter and zoom, then snap the
+     transport marks back onto the (possibly new) grid. */
+  function applyScale() {
+    const root = document.documentElement
+    root.style.setProperty('--bar', `${barPx()}px`)
+    root.style.setProperty('--ppb', `${barPx()}px`)
+    root.style.setProperty('--beat', `${pxPerBeat()}px`)
+    // clips with an explicit pixel width only repaint when their row signature
+    // changes, so clear it and nudge the observer timeline keeps on the rows
+    document.querySelectorAll('.lane-row').forEach((row) => { row.dataset.tlSig = '' })
+    const rows = $('lane-rows')
+    if (rows) rows.append(document.createComment('scale'))
+    zoomSlider.value = String(state.zoom)
+    rebuildRuler()
+    laneSpan()
+    const head = $('playhead')
+    if (head) head.style.left = `${pxOf(playheadBeats())}px`
+    if (state.loop) paintLoop()
+    return state.zoom
+  }
 
   function placePlayhead(beats) {
     state.playhead = Math.max(0, beats) * 60 / bpmNow()
@@ -1232,7 +1450,7 @@ export function attach(app) {
         beats = Math.max(beats, (c.startBeat || 0) + (c.lengthBeats || 0))
       })
     })
-    return Math.ceil(beats / 4) + 8
+    return Math.ceil(beats / barBeats()) + 8
   }
 
   // the ruler re-derives its own bar count from the arrangement and the zoom
@@ -1275,20 +1493,9 @@ export function attach(app) {
   function setZoom(value) {
     const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(Number(value) || state.zoom)))
     state.zoom = next
-    document.documentElement.style.setProperty('--bar', `${next}px`)
-    zoomSlider.value = String(next)
-    // clips with an explicit pixel width only repaint when their row signature
-    // changes, so clear it and nudge the observer timeline keeps on the rows
-    document.querySelectorAll('.lane-row').forEach((row) => { row.dataset.tlSig = '' })
-    const rows = $('lane-rows')
-    if (rows) rows.append(document.createComment('zoom'))
-    rebuildRuler()
+    applyScale()
     // the lane is only scrollable if it is actually wider than the viewport:
-    // give the rows and their host the full zoomed length
-    laneSpan()
-    const head = $('playhead')
-    if (head) head.style.left = `${pxOf(playheadBeats())}px`
-    if (state.loop) paintLoop()
+    // applyScale already gave the rows and their host the full zoomed length
     keepPlayheadInView()
     return next
   }
@@ -1301,6 +1508,43 @@ export function attach(app) {
     if (e.key === '=' || e.key === '+') { e.preventDefault(); setZoom(state.zoom + 14) }
     if (e.key === '-') { e.preventDefault(); setZoom(state.zoom - 14) }
   })
+
+  // ---------------------------------------------------------------- meter + key
+  // The header's static "4 / 4" becomes a real meter picker: the meter regroups
+  // the ruler, moves the beat scale and decides where the metronome accent lands.
+  function buildMeter() {
+    const slot = document.querySelector('.tb-left .ts')
+    if (!slot || slot.tagName === 'SELECT') return
+    const sel = document.createElement('select')
+    sel.id = 'in-timesig'
+    sel.className = 'ts'
+    sel.setAttribute('aria-label', 'Time signature')
+    sel.innerHTML = Object.keys(TIME_SIGS)
+      .map((sig) => `<option value="${sig}"${sig === state.timesig ? ' selected' : ''}>${sig.replace('/', ' / ')}</option>`).join('')
+    slot.replaceWith(sel)
+    sel.addEventListener('change', () => {
+      const next = TIME_SIGS[sel.value] ? sel.value : '4/4'
+      state.timesig = next
+      writeStore(TIMESIG_KEY, next)
+      applyScale()
+      snapLoop()
+      snapPlayhead()
+      drawRoll()
+      if (transport.playing) startLoopPlay({ from: transport.from, to: transport.to })
+      app.log(`meter ${next} — bars regroup every ${barBeats()} beats`)
+    })
+  }
+  buildMeter()
+
+  /* The key feeds snap()'s pitch target: the roll tints in-key rows and a drag
+     lands on the scale at the snap strength. app.js keeps the take in tune. */
+  function syncKey() {
+    state.key = { root: Number($('in-root')?.value) || 0, scale: $('in-scale')?.value || 'chromatic' }
+    if (activeRoll()) drawRoll()
+    state.edit?.paint?.()
+  }
+  $('in-root')?.addEventListener('change', syncKey)
+  $('in-scale')?.addEventListener('change', syncKey)
 
   // ---------------------------------------------------------------- metronome
   let metroCtx = null
@@ -1337,7 +1581,7 @@ export function attach(app) {
     const tick = () => {
       const spb = 60 / bpmNow()
       while (next < ctx.currentTime + 0.16) {
-        blip(next, state.metroAccent && transport.metroBeat % 4 === 0)
+        blip(next, state.metroAccent && transport.metroBeat % barBeats() === 0)
         transport.metroBeat += 1
         next += spb
       }
@@ -1685,7 +1929,7 @@ export function attach(app) {
 
   function countIn(bars, done) {
     const ctx = metroContext()
-    const total = bars * 4
+    const total = bars * barBeats()
     const spb = 60 / bpmNow()
     const badge = $('count-in')
     const first = ctx.currentTime + 0.1
@@ -1867,7 +2111,15 @@ export function attach(app) {
     if (transport.playing) { stopLoopPlay(); placePlayhead(transport.from); return }
     metroStop()
   })
-  $('in-bpm').addEventListener('change', () => { if (transport.playing) { const spec = { from: transport.from, to: transport.to }; startLoopPlay(spec) } })
+  $('in-bpm').addEventListener('change', () => {
+    applyScale()
+    snapLoop()
+    snapPlayhead()
+    drawRoll()
+    if (transport.playing) { const spec = { from: transport.from, to: transport.to }; startLoopPlay(spec) }
+  })
+  // the spinner fires input before change: keep the grid under the pointer
+  $('in-bpm').addEventListener('input', () => { if (document.activeElement === $('in-bpm')) applyScale() })
   $('in-countin').addEventListener('change', (e) => {
     state.countIn = Number(e.target.value)
     $('metro-countin').textContent = state.countIn ? `${state.countIn} bar${state.countIn === 1 ? '' : 's'}` : 'off'
@@ -1996,6 +2248,17 @@ export function attach(app) {
     renderAll() { renderTrackList(); syncAll(); drawRoll(); renderSounds(); renderVersions() },
     drawRoll,
     snap,
+    snapPitch,
+    barBeats: () => barBeats(),
+    timesig: (value) => {
+      const sel = $('in-timesig')
+      if (value !== undefined && sel && TIME_SIGS[value]) { sel.value = value; sel.dispatchEvent(new Event('change')) }
+      return state.timesig
+    },
+    rail: (collapsed) => {
+      if (collapsed !== undefined) setRail(!!collapsed)
+      return document.body.classList.contains('rail-collapsed') ? 'collapsed' : 'open'
+    },
     grid: (value) => {
       if (value !== undefined) { gridSel.value = String(value); gridSel.dispatchEvent(new Event('change')) }
       return { value: gridSel.value, label: gridSel.selectedOptions[0]?.textContent, beats: state.snapBeats }
