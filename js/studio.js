@@ -1710,6 +1710,7 @@ export function attach(app) {
         ? `Default — ${inputs[0].label}`
         : 'Default microphone'
     sel.append(fallback)
+    sel.title = fallback.textContent
     inputs.forEach((d, i) => {
       const opt = document.createElement('option')
       opt.value = d.deviceId
@@ -1900,7 +1901,11 @@ export function attach(app) {
     closeInput()
     ensureInput().catch(() => {})
   }
-  $('in-device')?.addEventListener('change', inputChanged)
+  $('in-device')?.addEventListener('change', () => {
+    inputChanged()
+    const sel = $('in-device')
+    if (sel) sel.title = sel.selectedOptions[0]?.textContent || ''
+  })
   refreshDevices()
   navigator.mediaDevices?.addEventListener?.('devicechange', refreshDevices)
   $('in-channel')?.addEventListener('change', () => {
