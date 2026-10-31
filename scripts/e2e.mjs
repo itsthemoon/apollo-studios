@@ -215,7 +215,11 @@ function report(exitCode, elapsedMs, note) {
     '2. `boot()` is not resilient to missing panels. With the Harmony/Voice/Tools sections removed',
     '   from the DOM, boot dies at `app.js:557` with `TypeError: Cannot set properties of null',
     '   (setting \'innerHTML\')`, status goes to "boot failed" and no presets render — the failure',
-    '   is a stuck page, not a degraded one.'
+    '   is a stuck page, not a degraded one.',
+    '3. The only in-page way to load the demo take is the button inside `.dropzone`, and',
+    '   `body:has(#note-list .note) .dropzone` hides it the moment a project has notes. A',
+    '   restored autosave therefore leaves the demo take unreachable by click (the suite falls',
+    '   back to `element.click()`), and a user has to clear the project first.'
   )
   writeFileSync(HANDOFF, lines.join('\n'))
 }
@@ -269,7 +273,13 @@ emit(probe("return JSON.stringify({url:location.href,"
       : { pass: false, detail: `rec=${d.rec} presets=${d.presets} scales=${d.scales} status=${show(d.status)} bootErr=${show(d.bootErr)}` })
 
     step(2, 'Load demo renders a note take', `
-emit(click("#btn-demo"))
+# a restored autosave already has notes, which hides the dropzone the demo
+# button lives in — then the coordinate click would land on the topbar
+ready = probe("var b=document.getElementById('btn-demo'); var r=b?b.getBoundingClientRect():null; return JSON.stringify({miss:!r||!r.width})")
+if ready.get("miss"):
+    emit(probe("document.getElementById('btn-demo').click(); return JSON.stringify({forced:true})"))
+else:
+    emit(click("#btn-demo"))
 time.sleep(2.4)  # real take: fetch + decode + pitch detect
 emit(probe("return JSON.stringify({rows:document.querySelectorAll('#note-list .note').length,"
            " count:(document.getElementById('note-count')||{}).textContent||'',"

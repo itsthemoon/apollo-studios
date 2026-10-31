@@ -17,6 +17,7 @@ import { install as installPanels } from './panels.js'
 import { install as installTimeline } from './timeline.js'
 import { install as installEdit } from './edit.js'
 import { install as installPersist } from './persist.js'
+import * as waves from './waves.js'
 
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 const DIVISION = 4
@@ -38,6 +39,8 @@ const state = {
   demoDuration: null,
   playhead: 0,
   live: null,
+  wavePeaks: new Map(),
+  takeSpans: new Map(),
 }
 
 // ---- helpers ---------------------------------------------------------------
@@ -235,18 +238,209 @@ function drawTake(canvas, take) {
   g.stroke()
 }
 
+/* ---- region waveforms ------------------------------------------------------
+   Every region draws the slice of its track's take covered by
+   `startBeat..startBeat+lengthBeats`, so splitting yields two real excerpts
+   instead of one picture and a row of blank boxes. Peaks come from a decimated
+   per-track cache (js/waves.js, built once per take), columns are capped, and
+   repaints coalesce into one animation frame.
+
+   Region 0 keeps the whole-take picture it always had while it is pristine (a
+   bar long, at beat 0); once it is trimmed or split it becomes an excerpt like
+   any other. Splitting adopts the pixels on screen first (see timeline.js), so
+   the two halves show exactly what the one picture showed. */
+const PRISTINE_BEATS = 4
+const MAX_CANVAS_PX = 2400
+const pristineRegion = (region) => !!region && region.startBeat === 0
+  && Math.abs(region.lengthBeats - PRISTINE_BEATS) < 1e-6
+
+function peaksFor(track, entry) {
+  if (!entry?.data?.length) return null
+  const known = state.wavePeaks.get(track.id)
+  if (known && known.data === entry.data && known.rate === entry.rate) return known
+  const cache = waves.buildCache(entry.data, entry.rate)
+  cache.data = entry.data
+  state.wavePeaks.set(track.id, cache)
+  return cache
+}
+
+function canvasIn(clip) {
+  if (!clip) return null
+  const found = clip.querySelector(':scope > canvas.wave')
+  if (found) return found
+  if (clip.id === 'clip-1') return $('wave')
+  const made = document.createElement('canvas')
+  made.className = 'wave'
+  made.height = 120
+  made.setAttribute('aria-hidden', 'true')
+  clip.append(made)
+  return made
+}
+
+const pxPerBeatNow = () => {
+  const lane = $('lane')
+  const raw = parseFloat(getComputedStyle(lane).getPropertyValue('--ppb'))
+  return (Number.isFinite(raw) && raw > 0 ? raw : 77) / 4
+}
+
+/* Region 0 of the same lane: the take is laid out against it. */
+function clip0Of(clip) {
+  if (!clip) return null
+  if (clip.id === 'clip-1') return clip
+  return clip.parentElement?.querySelector(':scope > .clip[data-region-index="0"]') || null
+}
+
+/**
+ * Beats the track's take is laid out over. A demo take is stretched to the lane
+ * (`data-full`) and so spans however many beats that width is; any other take
+ * spans its own duration at the current tempo. Recorded the first time it is
+ * needed and kept, so trimming region 0 cannot rescale the take under the
+ * remaining regions.
+ */
+function takeSpan(track, clip0) {
+  if (!track) return 0
+  const known = state.takeSpans.get(track.id)
+  if (Number.isFinite(known) && known > 0) return known
+  const entry = state.takes.get(track.id)
+  if (!entry) return 0
+  const width = clip0?.hasAttribute('data-full') ? (clip0.clientWidth || 0) : 0
+  if (width >= waves.MIN_PX) {
+    const span = width / pxPerBeatNow()
+    state.takeSpans.set(track.id, span)
+    return span
+  }
+  const bpm = Number($('in-bpm').value) || 96
+  const span = waves.spanOf(entry.data.length / entry.rate, bpm)
+  // only keep it once the lane is laid out; a zero-width clip must not pin a
+  // span the next paint cannot correct
+  if (clip0) state.takeSpans.set(track.id, span)
+  return span
+}
+
+/* the clip node under the DOM is the source of truth for which region it is */
+function regionAtNode(node) {
+  if (!node) return null
+  const tracks = state.tracks || []
+  const track = tracks.find(t => t && t.id === node.dataset.clip)
+    || (node.id === 'clip-1' || node.closest('.lane-row[data-row="1"]') ? tracks[0] : null)
+  if (!track) return null
+  const index = Number(node.dataset.regionIndex || 0)
+  const region = index === 0 ? track.clip
+    : (Array.isArray(track.clips) ? track.clips[index - 1] : null)
+  if (!region || !(region.lengthBeats > 0)) return null
+  return { track, index, region }
+}
+
+/* region 0 before it is touched: the whole take, exactly as it always drew */
+function drawWholeTake(canvas, clip, track) {
+  if (!canvas || !clip || !track) return
+  const entry = state.takes.get(track.id)
+  const take = entry?.data || (track.id === state.tracks[0]?.id ? state.take : null)
+  const w = Math.max(1, Math.round((clip.clientWidth || 0) - 20))
+  if (canvas.width !== w) canvas.width = w
+  // excerpt paints size the backing store to the box; the whole-take view has
+  // always been a 120 px tall picture squeezed by CSS, so put that back
+  if (canvas.height !== 120) canvas.height = 120
+  drawTake(canvas, take)
+}
+
+function drawRegionWave(track, clip, region) {
+  const canvas = canvasIn(clip)
+  if (!canvas) return
+  const box = canvas.getBoundingClientRect()
+  const width = Math.round(box.width || clip.getBoundingClientRect().width || 0)
+  // under three pixels nothing is legible: blank the canvas so a stale, wider
+  // picture cannot be stretched into the sliver
+  if (width < waves.MIN_PX) {
+    if (canvas.width !== 1 || canvas.height !== 1) { canvas.width = 1; canvas.height = 1 }
+    return
+  }
+  const g = canvas.getContext('2d')
+  if (!g) return
+  const height = Math.max(8, Math.round(box.height || 52))
+  const px = Math.min(width, MAX_CANVAS_PX)
+  if (canvas.width !== px) canvas.width = px
+  if (canvas.height !== height) canvas.height = height
+  g.globalAlpha = 1
+  g.fillStyle = '#0e0e13'
+  g.fillRect(0, 0, px, height)
+
+  const entry = state.takes.get(track.id)
+  const cache = peaksFor(track, entry)
+  if (!cache || !entry) return
+  const span = takeSpan(track, clip0Of(clip))
+  const win = waves.windowOf(region, span, cache.len)
+  if (!(win.to > win.from)) return
+  const cols = Math.min(px, waves.MAX_COLUMNS)
+  const { peak, rms } = waves.columns(cache, win.from, win.to, cols)
+  const mid = height / 2
+  const { ref } = cache
+  // same 24 dB window as drawTake, referenced to the take's own peak
+  const lit = (v) => Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6) / ref) + 24) / 24))
+
+  /* Brightness carries the fades: columns are grouped into 16 ramp steps so a
+     whole region is a handful of paths instead of one per column. */
+  const steps = new Map()
+  for (let x = 0; x < cols; x++) {
+    const { amp, ramp } = waves.envAt(region, x, cols)
+    const step = Math.max(1, Math.round(ramp * 15))
+    const band = steps.get(step)
+    if (band) band.push([x, amp])
+    else steps.set(step, [[x, amp]])
+  }
+  const colW = Math.max(1, Math.ceil(px / cols))
+  for (const [step, items] of steps) {
+    const k = step / 15
+    g.fillStyle = `rgb(${Math.round(111 * k)},${Math.round(168 * k)},${Math.round(255 * k)})`
+    g.globalAlpha = 0.95
+    for (const [x, amp] of items) {
+      const h = lit(rms[x]) * amp * (mid - 2)
+      if (h > 0) g.fillRect(Math.floor((x * px) / cols), mid - h, colW, h * 2)
+    }
+    g.globalAlpha = 0.35
+    for (const [x, amp] of items) {
+      const h = lit(peak[x]) * amp * (mid - 1)
+      if (h > 0) g.fillRect(Math.floor((x * px) / cols), mid - h, colW, h * 2)
+    }
+  }
+  g.globalAlpha = 1
+  g.strokeStyle = '#2c4a52'
+  g.beginPath()
+  g.moveTo(0, mid + 0.5)
+  g.lineTo(px, mid + 0.5)
+  g.stroke()
+}
+
+function paintRegions() {
+  for (const node of document.querySelectorAll('#lane .clip')) {
+    const hit = regionAtNode(node)
+    if (!hit) continue
+    if (hit.index === 0 && pristineRegion(hit.region)) drawWholeTake(canvasIn(node), node, hit.track)
+    else drawRegionWave(hit.track, node, hit.region)
+  }
+}
+
+let waveFrame = 0
+/* timeline.js, studio.js and record all call this; one frame per burst */
+function scheduleWaves() {
+  if (waveFrame) return
+  waveFrame = requestAnimationFrame(() => { waveFrame = 0; paintRegions() })
+}
+
 function drawWave() {
-  const canvas = $('wave')
   const clip = document.querySelector('.clip')
   if (clip) {
     // a real take spans the whole arrangement; the default is one bar (--ppb)
     clip.toggleAttribute('data-full', !!state.demoDuration)
     if (state.demoDuration) clip.title = `${state.demoDuration.toFixed(1)} s take`
-    const w = Math.max(1, Math.round(clip.clientWidth - 20))
-    if (canvas.width !== w) canvas.width = w
   }
-  drawTake(canvas, state.take)
+  paintRegions()
 }
+
+/* whoever moves, trims, splits or reloads a region asks for this and the next
+   animation frame repaints once, however many calls land in between */
+state.waveDirty = scheduleWaves
+window.addEventListener('resize', scheduleWaves)
 
 /* The take buffer is per track (`state.takes`); `state.take` stays the one that
    plays and edits. Every code path that lands a buffer goes through here so the
@@ -257,18 +451,19 @@ function keepTake(take, rate, trackId) {
   if (id) {
     state.takeTrack = id
     state.takes.set(id, { data: take, rate: Number(rate) || state.sampleRate })
+    state.takeSpans.delete(id)
   }
   return take
 }
 
-/* Repaint one track's region 0 from its own buffer — a restore, not a record. */
+/* Repaint one track's regions from its own buffer — a restore, not a record. */
 function paintTake(trackId) {
   const track = state.tracks.find(t => t.id === trackId)
   const entry = state.takes.get(trackId)
   if (!track || !entry) return
-  if (track.id === state.tracks[0]?.id) { drawWave(); return }
-  const canvas = takeSurface(track)?.canvas
-  if (canvas) drawTake(canvas, entry.data)
+  takeSurface(track) // a lane that has no region 0 yet gets one
+  if (track.id === state.tracks[0]?.id) drawWave()
+  else paintRegions()
 }
 
 /* persist.js hands a stored buffer back here: map, take, title, waveform. */
@@ -277,6 +472,7 @@ function attachTake(trackId, data, rate) {
   if (!buf.length) return false
   const r = Number(rate) || state.sampleRate
   state.takes.set(trackId, { data: buf, rate: r })
+  state.takeSpans.delete(trackId)
   if (!state.take?.length || trackId === state.takeTrack) {
     state.take = buf
     state.takeTrack = trackId
@@ -436,10 +632,9 @@ function stopLiveTake() {
   }
 }
 
-function redrawTrackTake(track, surface) {
+function redrawTrackTake(track) {
   if (!track) return
-  if (track.id === state.tracks[0]?.id) drawWave()
-  else drawTake(surface?.canvas, state.take)
+  paintTake(track.id)
 }
 
 async function toggleRecord() {

@@ -84,6 +84,7 @@ const PATHS = {
   repeat: '<path d="M4 8V6.5A2.5 2.5 0 0 1 6.5 4H16l-2.4-2.2"/><path d="M16 12v1.5a2.5 2.5 0 0 1-2.5 2.5H4l2.4 2.2"/>',
   // aliases used by panels.js "more" menu keys
   addtrack: '<path d="M10 4v12M4 10h12"/>',
+  demo: '<path d="M4 10h2.5l1.8-5 3.4 10 1.8-5H16"/>',
   arm: '<circle cx="10" cy="10" r="6.5"/><circle cx="10" cy="10" r="2.3"/>',
   editor: '<path d="M3 15l1-4L13 3l3 3-9 8z"/>',
   mastering: '<path d="M7.5 15V5l8-1.6v9.4"/><circle cx="5.5" cy="15.5" r="2"/><circle cx="13.5" cy="13.4" r="2"/>',

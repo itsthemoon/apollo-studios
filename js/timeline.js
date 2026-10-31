@@ -175,6 +175,8 @@ export function install({ state, log }) {
     node.classList.toggle('tl-reversed', !!region.reverse)
     node.classList.toggle('tl-stretched', region.stretch !== 1)
     node.style.setProperty('--tl-gain', String(Number.isFinite(region.gain) ? region.gain : 1))
+    // geometry drives which samples are visible, so the wave repaints with it
+    state.waveDirty?.()
   }
 
   function paintSelection() {
@@ -238,6 +240,19 @@ export function install({ state, log }) {
     }
     node.setAttribute('role', 'group')
     node.setAttribute('aria-label', `${track.name} region`)
+    // every region carries its own wave canvas; app.js draws this region's
+    // excerpt of the take into it
+    const existing = node.querySelector(':scope > canvas')
+    if (existing) {
+      if (!existing.classList.contains('wave')) existing.classList.add('wave')
+    } else {
+      const canvas = document.createElement('canvas')
+      canvas.className = 'wave'
+      canvas.width = 120
+      canvas.height = 120
+      canvas.setAttribute('aria-hidden', 'true')
+      node.append(canvas)
+    }
     for (const edge of ['in', 'out']) {
       if (node.querySelector(`.tl-fade.${edge}`)) continue
       const tri = document.createElement('span')
@@ -334,6 +349,22 @@ export function install({ state, log }) {
   }
 
   // ---------------------------------------------------------------- region ops
+  /* A demo take stretched across the lane (`data-full`) is drawn far wider than
+     its four-beat length. Any beat-space operation has to read real beats, so
+     adopt the pixels on screen first — otherwise a split lands outside the
+     region and the two halves would not add up to the picture that was there. */
+  function adoptVisual(node, track, region) {
+    if (!node || !track || !region) return false
+    if (!node.hasAttribute('data-full') || region.startBeat !== 0) return false
+    if (Math.abs(region.lengthBeats - DEFAULT_LENGTH) >= 1e-6) return false
+    const span = Math.max(MIN_BEATS, node.getBoundingClientRect().width / pxPerBeat())
+    // the take is laid out over exactly this many beats: pin that before the
+    // clip narrows, so both halves still map onto the pixels they were cut from
+    state.takeSpans?.set(track.id, span)
+    region.lengthBeats = round2(span)
+    return true
+  }
+
   function dropRegion(track, index) {
     const extra = listOf(track)
     if (index === 0) {
@@ -372,28 +403,39 @@ export function install({ state, log }) {
     const track = trackOf(target.track)
     const region = regionAt(track, target.index)
     if (!track || !region) return
+    const before = clipSnapshot()
     if (action === 'split') {
+      adoptVisual(document.querySelector(`.clip[data-clip="${target.track}"][data-region-index="${target.index}"]`), track, region)
       const at = playheadBeats()
       const out = splitRegion(track, target.index, at)
       log(out ? `split at ${at.toFixed(2)} beats` : 'split: playhead outside the region')
       if (!out) return
+      pushClipUndo(before)
     } else if (action === 'duplicate') {
       const copy = duplicateRegion(track, target.index)
-      log(copy ? `duplicated region to beat ${copy.startBeat}` : 'duplicate: no region')
+      if (!copy) return
+      pushClipUndo(before)
+      log(`duplicated region to beat ${copy.startBeat}`)
     } else if (action === 'delete') {
+      pushClipUndo(before)
       log('region deleted')
       dropRegion(track, target.index)
       setSelection([])
       ui.menu = null
     } else if (action === 'reverse') {
+      pushClipUndo(before)
       region.reverse = !region.reverse
       log(`region ${region.reverse ? 'reversed' : 'forward'}`)
     } else if (action === 'stretch') {
+      pushClipUndo(before)
       region.stretch = region.stretch === 1 ? 2 : 1
       log(`region stretch ${region.stretch === 1 ? 'off' : 'x2'}`)
     } else if (action === 'rename') {
       const next = window.prompt('Region name', region.name || track.name)
-      if (next !== null) { region.name = next.trim().slice(0, 60); log(`region renamed: ${region.name || track.name}`) }
+      if (next === null) return
+      pushClipUndo(before)
+      region.name = next.trim().slice(0, 60)
+      log(`region renamed: ${region.name || track.name}`)
     } else return
     mark(track)
   }
@@ -413,7 +455,12 @@ export function install({ state, log }) {
     ui.drag = null
     document.body.classList.remove('tl-dragging', 'tl-moving')
     try { drag.node.releasePointerCapture(drag.pointerId) } catch { /* already gone */ }
-    if (drag.kind === 'trim') drag.node.classList.remove('trimming')
+    if (drag.kind === 'trim') {
+      drag.node.classList.remove('trimming')
+      // the snapshot was taken before the adoption, so undo restores the exact
+      // pre-drag window and the excerpt with it
+      if (drag.moved && drag.undoBefore) pushClipUndo(drag.undoBefore)
+    }
     if (drag.kind === 'move') drag.tracks.forEach((track) => mark(track))
     else mark(drag.track)
   }
@@ -477,11 +524,11 @@ export function install({ state, log }) {
     return true
   }
 
-  function pushClipUndo() {
+  function pushClipUndo(snap = clipSnapshot()) {
     hookUndo()
     const edit = state.edit
     if (!edit) return false
-    edit.undo.push(clipSnapshot())
+    edit.undo.push(snap)
     if (edit.undo.length > MAX_CLIP_UNDO) edit.undo.shift()
     edit.redo.length = 0
     return true
@@ -771,11 +818,25 @@ export function install({ state, log }) {
     setSelection([selKey(hit.track.id, hit.index)])
     const kind = trim ? 'trim' : 'fade'
     const edge = trim ? trim.dataset.trim : fade.classList.contains('in') ? 'in' : 'out'
-    if (trim && hit.node.hasAttribute('data-full') && hit.region.startBeat === 0
-      && Math.abs(hit.region.lengthBeats - DEFAULT_LENGTH) < 1e-6) {
-      // a stretched demo take is drawn wider than its beat length; adopt the
-      // pixels on screen so the first trim starts from what the user can see
-      hit.region.lengthBeats = round2(Math.max(MIN_BEATS, hit.node.getBoundingClientRect().width / pxPerBeat()))
+    if (trim) {
+      const before = clipSnapshot()
+      adoptVisual(hit.node, hit.track, hit.region)
+      hit.node.classList.add('trimming')
+      beginDrag({
+        kind,
+        edge,
+        node: hit.node,
+        track: hit.track,
+        region: hit.region,
+        startX: e.clientX,
+        startBeat: hit.region.startBeat,
+        lengthBeats: hit.region.lengthBeats,
+        fadeIn: hit.region.fadeIn || 0,
+        fadeOut: hit.region.fadeOut || 0,
+        stretch: hit.region.stretch ?? 1,
+        undoBefore: before,
+      }, e.pointerId)
+      return
     }
     hit.node.classList.add('trimming')
     beginDrag({
@@ -952,6 +1013,7 @@ export function install({ state, log }) {
     queueMicrotask(() => {
       document.body.classList.toggle('tl-auto', !!state.showAutomation)
       syncLanes()
+      state.waveDirty?.()
     })
   }, true)
 
@@ -1101,6 +1163,8 @@ export function install({ state, log }) {
   $('btn-split-region')?.addEventListener('click', () => {
     const track = trackOf(state.active)
     if (!track) return
+    const before = clipSnapshot()
+    adoptVisual(document.getElementById('clip-1'), track, track.clip)
     const at = playheadBeats()
     const index = [track.clip, ...(track.clips || [])].findIndex((region) => (
       region && at > region.startBeat + MIN_BEATS && at < region.startBeat + region.lengthBeats - MIN_BEATS
@@ -1108,6 +1172,7 @@ export function install({ state, log }) {
     if (index === -1) { log('split: playhead outside every region'); return }
     const out = splitRegion(track, index, at)
     log(out ? `split at ${at.toFixed(2)} beats` : 'split: region too short')
+    if (out) pushClipUndo(before)
     mark(track)
   })
 

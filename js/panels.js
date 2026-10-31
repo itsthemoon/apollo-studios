@@ -556,6 +556,7 @@ export function install({ state, log }) {
   more.hidden = true
   more.innerHTML = [
     ['addtrack', 'Add Track', 'project.newTrack'],
+    ['demo', 'Load Demo Take', ''],
     ['fx', 'Fx', 'view.effects'],
     ['arm', 'Arm Automation', 'tools.armAutomation'],
     ['automation', 'Show/Hide Automation', 'tools.toggleAutomation'],
@@ -623,6 +624,7 @@ export function install({ state, log }) {
     more.hidden = true
     moreBtn.setAttribute('aria-expanded', 'false')
     if (key === 'addtrack') return openModal('addtrack')
+    if (key === 'demo') return $('btn-demo')?.click()
     if (key === 'fx') return state.studio?.fxOpen?.()
     if (key === 'arm') return $('btn-automation-arm').click()
     if (key === 'automation') return $('btn-automation').click()
