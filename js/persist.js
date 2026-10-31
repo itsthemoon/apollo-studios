@@ -365,7 +365,7 @@ export function install({ state, log } = {}) {
         const sig = String(data.timesig)
         if (ts && [...ts.options].some((o) => o.value === sig)) {
           ts.value = sig
-          ts.dispatchEvent(new Event('change', { bubbles: true }))
+          setTimeout(() => ts.dispatchEvent(new Event('change', { bubbles: true })), 0)
         }
       }
       if ($('in-root') && data.key) $('in-root').value = String(num(Number(data.key.root), 0, 0, 11))
