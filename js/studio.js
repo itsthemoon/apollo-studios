@@ -316,7 +316,7 @@ export function attach(app) {
         </div>
         <div class="th-row">
           <button class="fx" type="button" aria-label="Add a plug-in" data-fx="${t.id}">+ Fx</button>
-          <span class="fx-count" data-fx-count="${t.id}">${t.chain.effects.length ? t.chain.effects.length + ' effects' : 'no effects'}</span>
+          <span class="fx-count" data-fx-count="${t.id}">${t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'}</span>
           <span class="th-spacer"></span>
         </div>
         <div class="th-row vol-row">
@@ -377,7 +377,7 @@ export function attach(app) {
     const n = document.querySelector(`[data-track="${t.id}"] .tname`)
     if (n && n.textContent !== t.name) n.textContent = t.name
     const fc = document.querySelector(`[data-fx-count="${t.id}"]`)
-    if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effects` : 'no effects'
+    if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
   }
 
   document.addEventListener('input', (e) => {
@@ -992,7 +992,7 @@ export function attach(app) {
       host.append(row)
     }
     const fc = document.querySelector(`[data-fx-count="${t.id}"]`)
-    if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effects` : 'no effects'
+    if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
   }
 
   $('fx-chain').addEventListener('click', (e) => {
