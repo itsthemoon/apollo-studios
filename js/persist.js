@@ -263,6 +263,13 @@ export function install({ state, log } = {}) {
       rolls: [...state.rolls].map(([id, r]) => [id, r ? roll.cloneRoll(r) : null]),
       patterns: [...state.patterns].map(([id, p]) => [id, clone(p)]),
       notes: clone(state.notes),
+      // selection travels with the project: the clip keys are "trackId/index",
+      // the note keys the editor's own. Both are filtered on load.
+      sel: {
+        clips: [...(state.tlSel || [])].map(String),
+        notes: [...(state.editSel || state.edit?.sel || [])].map(String),
+        primary: typeof state.edit?.primary === 'string' ? state.edit.primary : null,
+      },
       lyrics: clone(state.lyrics),
       chat: clone(state.chat || []),
       master: { ...state.masterState },
@@ -298,6 +305,7 @@ export function install({ state, log } = {}) {
     }
     if (data.versions !== undefined && !Array.isArray(data.versions)) throw new Error('project: versions must be a list')
     if (data.bands !== undefined && !Array.isArray(data.bands)) throw new Error('project: bands must be a list')
+    if (data.sel !== undefined && (!data.sel || typeof data.sel !== 'object' || Array.isArray(data.sel))) throw new Error('project: sel must be an object')
     if (data.tempo !== undefined && !Number.isFinite(Number(data.tempo))) throw new Error('project: bad tempo')
     return data
   }
@@ -387,7 +395,15 @@ export function install({ state, log } = {}) {
       state.selected = null
       state.edit?.sel?.clear?.()
       if (state.edit) state.edit.primary = null
+      // a restored note keeps the `_eid` it was saved with, so the editor's
+      // counter has to start past the highest one or new notes collide
+      const topEid = state.notes.reduce((max, n) => {
+        const m = /^v(\d+)$/.exec(String(n._eid || ''))
+        return m ? Math.max(max, Number(m[1])) : max
+      }, 0)
+      if (state.edit && topEid > state.edit.eid) state.edit.eid = topEid
       state.studio?.renderAll?.()
+      applySelection(data.sel)
       state.studio?.drawRoll?.()
       // notes belong to a take that is not in storage: keep the list empty so
       // nothing pretends to be playable, and say where the notes went
@@ -429,6 +445,61 @@ export function install({ state, log } = {}) {
     })
     if ($('in-ap-strength')) $('in-ap-strength').value = String(Math.round(s.strength * 100))
     if ($('out-ap-strength')) $('out-ap-strength').textContent = `${Math.round(s.strength * 100)} %`
+  }
+
+  // ---------------------------------------------------------------- selection
+  const regionAt = (track, index) => {
+    if (!track) return null
+    if (index === 0) return track.clip || null
+    return Array.isArray(track.clips) ? track.clips[index - 1] || null : null
+  }
+
+  function paintClips(live) {
+    document.querySelectorAll('.clip').forEach((node) => {
+      const key = `${node.dataset.clip}/${Number(node.dataset.regionIndex || 0)}`
+      const on = live.has(key)
+      node.classList.toggle('sel', on)
+      node.classList.toggle('tl-selected-source', on)
+      if (on) node.setAttribute('aria-selected', 'true')
+      else node.removeAttribute('aria-selected')
+    })
+  }
+
+  /* A stored selection is a set of keys, and a key only survives if its track,
+     region or note is still in the restored project. The live Sets are mutated
+     in place so the timeline and the editor keep pointing at the same ones. */
+  function applySelection(sel) {
+    const clips = Array.isArray(sel?.clips) ? sel.clips.map(String) : []
+    const notes = Array.isArray(sel?.notes) ? sel.notes.map(String) : []
+    const live = state.tlSel
+    if (live?.clear) {
+      live.clear()
+      for (const key of clips) {
+        const at = key.lastIndexOf('/')
+        if (at < 1) continue
+        const track = state.tracks.find((t) => t.id === key.slice(0, at))
+        const index = Number(key.slice(at + 1)) || 0
+        if (regionAt(track, index)) live.add(`${track.id}/${index}`)
+      }
+      paintClips(live)
+    }
+
+    const edit = state.edit
+    if (!edit?.sel) return
+    edit.sel.clear()
+    const activeRoll = state.rolls.get(state.active)
+    const pool = new Set(activeRoll
+      ? activeRoll.notes.map((n) => `r:${n.id}`)
+      : state.notes.filter((n) => n._eid).map((n) => `v:${n._eid}`))
+    for (const key of notes) if (pool.has(key)) edit.sel.add(key)
+    const primary = typeof sel?.primary === 'string' && pool.has(sel.primary) ? sel.primary : [...edit.sel][0] ?? null
+    edit.primary = primary
+    state.editSel = edit.sel
+    state.selected = primary?.startsWith('v:') ? state.notes.findIndex((n) => `v:${n._eid}` === primary) : null
+    if (state.selected === -1) state.selected = null
+    // the note list and the roll overlay both draw from the live selection
+    if (window.VS?.setState) window.VS.setState({ notes: state.notes })
+    edit.paint?.()
   }
 
   // ---------------------------------------------------------------- take audio
@@ -718,6 +789,7 @@ export function install({ state, log } = {}) {
       sel: [...(uiEdit?.sel || [])],
       primary: uiEdit?.primary ?? null,
       rolls: new Map([...state.rolls].map(([id, r]) => [id, r ? roll.cloneRoll(r) : null])),
+      mixer: uiEdit?.mixerRows ? uiEdit.mixerRows() : undefined,
     }
   }
 
@@ -728,6 +800,7 @@ export function install({ state, log } = {}) {
     if (uiEdit.undo.length > MAX_UNDO) uiEdit.undo.shift()
     uiEdit.redo.length = 0
     if (snapshot.kind === 'roll') state.undoRoll?.push(snapshot.rolls.get(snapshot.active))
+    uiEdit.syncButtons?.()
     return true
   }
 
@@ -879,6 +952,8 @@ export function install({ state, log } = {}) {
     window.VS?.drawWave?.()
     state.undoRoll = []
     state.edit?.undo?.splice?.(0)
+    state.edit?.redo?.splice?.(0)
+    state.edit?.syncButtons?.()
     if ($('proj-name')) $('proj-name').value = 'untitled'
     state.tag = 'skin'
     paintTag()

@@ -384,9 +384,17 @@ export function attach(app) {
     const el = e.target
     if (el.dataset.vol) {
       const t = findTrack(el.dataset.vol)
+      if (!t) return
       tracks.setVolumeDb(t, Number(el.value))
-      el.closest('.vol-row').querySelector('[data-vol-read]').textContent = `${t.volumeDb.toFixed(1)} dB`
-      renderMixer()
+      // a strip has no .vol-row; mirroring both readouts and the other fader
+      // keeps the drag alive instead of re-rendering the strip under the pointer
+      const read = document.querySelector(`[data-vol-read="${t.id}"]`)
+      if (read) read.textContent = `${t.volumeDb.toFixed(1)} dB`
+      const db = el.closest('.strip')?.querySelector('.db')
+      if (db) db.textContent = t.volumeDb.toFixed(1)
+      document.querySelectorAll(`[data-vol="${t.id}"]`).forEach((x) => { if (x !== el) x.value = String(t.volumeDb) })
+      const dock = $('in-track-vol')
+      if (dock && t.id === state.active) dock.value = String(t.volumeDb)
     }
     if (el.dataset.pan) {
       const t = findTrack(el.dataset.pan)

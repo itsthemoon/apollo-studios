@@ -14,6 +14,8 @@
 // an instrument track edits its roll (beats, integer midi + a detune `cents`).
 import * as roll from './roll.js'
 import * as tune from './tune.js'
+import * as tracks from './tracks.js'
+import * as fx from './fx.js'
 import { rollBounds, rollPoint, ROLL_GUTTER } from './studio.js'
 
 const $ = (id) => document.getElementById(id)
@@ -26,6 +28,10 @@ const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
 
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
 const centsOf = (n) => (Number.isFinite(n) ? Math.round(n) : 0)
+// Every stack entry carries a kind only so the log line reads honestly.
+const KIND_LABEL = { roll: 'roll edit', voice: 'take notes', mixer: 'mixer move' }
+const kindLabel = (k) => KIND_LABEL[k] || 'mixer move'
+const panRead = (p) => (p === 0 ? 'C' : p < 0 ? `L${Math.round(-p * 100)}` : `R${Math.round(p * 100)}`)
 const noteName = (midi) => {
   const m = Math.round(midi)
   return `${NAMES[((m % 12) + 12) % 12]}${Math.floor(m / 12) - 1}`
@@ -181,17 +187,39 @@ export function install({ state, log } = {}) {
   }
 
   // ---------------------------------------------------------------- snapshots
-  function snapshot() {
+  const cloneEffect = (effect) => ({ ...effect, params: { ...effect.params } })
+  const sameChain = (a, b) => a.length === b.length && a.every((e, i) => e.id === b[i].id)
+  const nextFxId = (list) => list.reduce((max, e) => Math.max(max, Number(String(e.id).replace(/[^\d]/g, '')) || 0), 0) + 1
+
+  /* One row per track: every value a strip owns. A gesture that only touches a
+     note still records the mixer, so one Ctrl+Z always lands on a whole mixer
+     state instead of a half-applied one. */
+  function mixerRows() {
+    return state.tracks.map((t) => ({
+      id: t.id,
+      volumeDb: t.volumeDb,
+      pan: t.pan,
+      mute: t.mute === true,
+      solo: t.solo === true,
+      sends: { reverb: t.sends?.reverb || 0, delay: t.sends?.delay || 0 },
+      chain: (t.chain?.effects || []).map(cloneEffect),
+    }))
+  }
+
+  function snapshot(kindOverride) {
     return {
-      kind: kind(),
+      kind: kindOverride || kind(),
       active: state.active,
       selected: state.selected,
       notes: state.notes.map((n) => ({ ...n })),
       sel: [...ui.sel],
       primary: ui.primary,
       rolls: new Map([...state.rolls].map(([id, r]) => [id, roll.cloneRoll(r)])),
+      mixer: mixerRows(),
     }
   }
+
+  const mixSnapshot = () => snapshot('mixer')
 
   function pushUndo(snap) {
     ui.undo.push(snap)
@@ -202,6 +230,35 @@ export function install({ state, log } = {}) {
       const past = snap.rolls.get(snap.active)
       if (past) state.undoRoll.push(past)
     }
+    syncButtons()
+  }
+
+  /* Faders, sends, mutes, solos and chain slots come back here. The chain is
+     restored as whole effect objects (params included) so an undo after a
+     removal brings the slot back rather than leaving a hole. */
+  function applyMixer(list) {
+    if (!Array.isArray(list)) return
+    const byId = new Map(list.map((m) => [m.id, m]))
+    let chains = false
+    for (const t of state.tracks) {
+      const src = byId.get(t.id)
+      if (!src) continue
+      tracks.setVolumeDb(t, Number(src.volumeDb))
+      tracks.setPan(t, Number(src.pan))
+      tracks.setSend(t, 'reverb', Number(src.sends?.reverb))
+      tracks.setSend(t, 'delay', Number(src.sends?.delay))
+      t.mute = src.mute === true
+      t.solo = src.solo === true
+      if (!t.chain || !Array.isArray(src.chain)) continue
+      const effects = src.chain.map(cloneEffect)
+      if (sameChain(t.chain.effects, effects)) continue
+      t.chain.effects = effects
+      fx.ensureLimiterLast(t.chain)
+      t.chain.nextId = nextFxId(effects)
+      chains = true
+    }
+    paintMixer()
+    if (chains) state.studio?.setActive?.(state.active)
   }
 
   function restore(snap) {
@@ -213,6 +270,7 @@ export function install({ state, log } = {}) {
     setSel(new Set(snap.sel))
     ui.primary = snap.primary
     syncSelectedIndex()
+    applyMixer(snap.mixer)
     redraw()
   }
 
@@ -222,7 +280,7 @@ export function install({ state, log } = {}) {
     ui.redo.push(snapshot())
     if (snap.kind === 'roll') state.undoRoll?.pop()
     restore(snap)
-    log(`undo: ${snap.kind === 'roll' ? 'roll edit' : 'take notes'} restored`)
+    log(`undo: ${kindLabel(snap.kind)} restored`)
   }
 
   function redo() {
@@ -230,8 +288,33 @@ export function install({ state, log } = {}) {
     if (!snap) return
     ui.undo.push(snapshot())
     restore(snap)
-    log(`redo: ${snap.kind === 'roll' ? 'roll edit' : 'take notes'} reapplied`)
+    log(`redo: ${kindLabel(snap.kind)} reapplied`)
   }
+
+  // ---------------------------------------------------------------- buttons
+  /* Depth is mirrored on the toolbar whichever surface pushed: a clip delete
+     from the arrangement or a quantize from the panel land on the same stacks
+     without passing through pushUndo, so the rAF tick is the safety net. */
+  let btnSig = ''
+  function syncButtons() {
+    const sig = `${ui.undo.length}:${ui.redo.length}`
+    if (sig === btnSig) return
+    btnSig = sig
+    for (const [id, depth, verb] of [['btn-undo', ui.undo.length, 'Undo'], ['btn-redo', ui.redo.length, 'Redo']]) {
+      const btn = $(id)
+      if (!btn) continue
+      const off = depth === 0
+      btn.disabled = off
+      btn.setAttribute('aria-disabled', String(off))
+      btn.title = off ? `Nothing to ${verb.toLowerCase()}` : `${verb} (${depth})`
+    }
+  }
+  function watchButtons() {
+    syncButtons()
+    ui.btnRaf = requestAnimationFrame(watchButtons)
+  }
+  ui.syncButtons = syncButtons
+  ui.mixerRows = mixerRows
 
   // ---------------------------------------------------------------- redraw
   // The note list renderer is app.js's `renderNotes`, reached through the
@@ -293,6 +376,92 @@ export function install({ state, log } = {}) {
     paintInspector()
   }
   ui.paint = paint
+
+  // ---------------------------------------------------------------- mixer
+  /* Undo has to put the pixels back too, so a restore repaints every strip from
+     the model instead of asking for a re-render that would drop focus. */
+  function paintMixer() {
+    const audible = tracks.resolveSolo(state.tracks)
+    for (const t of state.tracks) {
+      document.querySelector(`[data-strip="${t.id}"]`)?.classList.toggle('off', !audible.has(t.id))
+      document.querySelectorAll(`[data-vol="${t.id}"]`).forEach((el) => {
+        el.value = String(t.volumeDb)
+        const db = el.closest('.strip')?.querySelector('.db')
+        if (db) db.textContent = t.volumeDb.toFixed(1)
+      })
+      document.querySelectorAll(`[data-vol-read="${t.id}"]`).forEach((el) => { el.textContent = `${t.volumeDb.toFixed(1)} dB` })
+      document.querySelectorAll(`[data-pan="${t.id}"]`).forEach((el) => { el.value = String(t.pan * 100) })
+      document.querySelectorAll(`[data-pan-read="${t.id}"]`).forEach((el) => { el.textContent = panRead(t.pan) })
+      for (const key of ['reverb', 'delay']) {
+        const send = t.sends?.[key] || 0
+        document.querySelectorAll(`[data-send="${t.id}:${key}"]`).forEach((el) => {
+          el.value = String(Math.round(send * 100))
+          const knob = el.closest('.sendknob')
+          if (!knob) return
+          knob.classList.toggle('on', send > 0)
+          const out = knob.querySelector('output')
+          if (out) out.textContent = send > 0 ? `${Math.round(send * 100)}%` : '–'
+        })
+      }
+      document.querySelectorAll(`[data-mute="${t.id}"], [data-solo="${t.id}"]`).forEach((b) => {
+        const on = b.dataset.mute ? t.mute : t.solo
+        b.setAttribute('aria-pressed', String(on))
+        b.classList.toggle('on', !!on)
+      })
+      const inserts = t.chain?.effects.filter((e) => e.slug !== fx.LIMITER_SLUG).length || 0
+      document.querySelectorAll(`[data-fx-count="${t.id}"]`).forEach((el) => {
+        el.textContent = t.chain?.effects.length ? `${t.chain.effects.length} effects` : 'no effects'
+      })
+      document.querySelectorAll(`[data-insert="${t.id}"]`).forEach((el) => {
+        el.classList.toggle('loaded', inserts > 0)
+        el.textContent = `fx ${inserts}`
+      })
+    }
+    const panelVol = $('in-track-vol')
+    if (panelVol) {
+      const t = state.tracks.find((x) => x.id === state.active)
+      if (t) panelVol.value = String(t.volumeDb)
+    }
+  }
+  ui.paintMixer = paintMixer
+
+  /* One snapshot per gesture, not per pixel: the snapshot is taken in the
+     capture phase — before studio's `input` writer has touched the model — and
+     only lands on the stack if the control actually ended somewhere else. */
+  const mix = { open: false, el: null, snap: null, before: '', what: '' }
+  const MIX_CONTROLS = '[data-vol],[data-pan],[data-send],#in-track-vol'
+
+  function beginMix(control) {
+    if (mix.open || !control) return
+    const what = control.dataset.send ? (control.dataset.send.endsWith('reverb') ? 'send A' : 'send B')
+      : control.dataset.pan ? 'pan' : 'volume'
+    mix.open = true
+    mix.el = control
+    mix.before = control.value
+    mix.snap = mixSnapshot()
+    mix.what = what
+  }
+
+  function endMix() {
+    if (!mix.open) return
+    const el = mix.el
+    const changed = !!el && el.value !== mix.before
+    const what = mix.what
+    const snap = mix.snap
+    const trackId = el?.dataset.vol || el?.dataset.pan || el?.dataset.send?.split(':')[0]
+    const track = trackId ? state.tracks.find((t) => t.id === trackId) : state.tracks.find((t) => t.id === state.active)
+    mix.open = false
+    mix.el = null
+    mix.snap = null
+    mix.what = ''
+    if (!changed) return
+    pushUndo(snap)
+    if (!track) return
+    const read = what === 'volume' ? `${track.volumeDb.toFixed(1)} dB`
+      : what === 'pan' ? panRead(track.pan)
+        : `${Math.round((what === 'send A' ? track.sends?.reverb : track.sends?.delay) * 100)}%`
+    log(`${what} ${read}: ${track.name}`)
+  }
 
   function showGhostAt(left, top, note) {
     const c = kind() === 'voice' ? centsOf((note.midi - Math.round(note.midi)) * 100) : centsOf(note.cents)
@@ -607,7 +776,9 @@ export function install({ state, log } = {}) {
   function typing(el) {
     if (!el) return false
     const tag = String(el.tagName || '').toUpperCase()
-    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true
+    // a range or checkbox keeps focus after a gesture; Ctrl+Z must still work
+    if (tag === 'INPUT') return !['range', 'checkbox', 'radio', 'button'].includes(el.type)
+    return tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable === true
   }
 
   function onKey(e) {
@@ -683,6 +854,38 @@ export function install({ state, log } = {}) {
 
   $('btn-undo')?.addEventListener('click', () => undo())
   $('btn-redo')?.addEventListener('click', () => redo())
+
+  // mixer gestures: snapshot in capture (pre-write), commit on release
+  document.addEventListener('pointerdown', (e) => {
+    const control = e.target.closest?.(MIX_CONTROLS)
+    if (!control) return
+    // a release lost outside the window must not wedge the next gesture
+    if (mix.open && mix.el !== control) endMix()
+    beginMix(control)
+  }, true)
+  document.addEventListener('input', (e) => {
+    // keyboard arrows and programmatic writes have no pointerdown to lean on
+    if (!mix.open) beginMix(e.target.closest?.(MIX_CONTROLS))
+  }, true)
+  document.addEventListener('change', (e) => {
+    if (mix.open && e.target === mix.el) endMix()
+  }, true)
+  for (const ev of ['pointerup', 'pointercancel']) {
+    document.addEventListener(ev, () => endMix(), true)
+  }
+  window.addEventListener('blur', () => endMix())
+
+  // discrete mixer steps: one entry each, taken before studio's own handlers run
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest?.('[data-mute], [data-solo], #btn-fx-up, #btn-fx-down, #btn-fx-remove, [data-add], [data-bypass]')
+    if (!el || el.disabled) return
+    pushUndo(snapshot('mixer'))
+  }, true)
+  document.addEventListener('dblclick', (e) => {
+    if (e.target.closest?.('[data-pan]')) pushUndo(snapshot('mixer'))
+  }, true)
+
+  watchButtons()
 
   // character sliders: one undo entry per gesture, not per pixel
   $('in-note-formant').addEventListener('pointerdown', beginFxEdit)
