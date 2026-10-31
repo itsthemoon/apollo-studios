@@ -239,6 +239,15 @@ async function main() {
   targetId = openTab()
   const pageUrl = APP
 
+  // A restored autosave from an earlier run would make every later assertion
+  // depend on whatever that run left behind, so start from a blank browser.
+  runHarness(`
+emit(probe("localStorage.clear(); return 1"))
+cdp("Page.navigate", session_id=SID, url=${JSON.stringify(APP)})
+wait_ready(8000)
+`)
+  await new Promise(r => setTimeout(r, 700))
+
   try {
     await new Promise(r => setTimeout(r, 800))
 
