@@ -378,6 +378,12 @@ export function attach(app) {
     if (n && n.textContent !== t.name) n.textContent = t.name
     const fc = document.querySelector(`[data-fx-count="${t.id}"]`)
     if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
+    const slot = document.querySelector(`.strip [data-insert="${t.id}"]`)
+    if (slot) {
+      const n2 = t.chain.effects.length
+      slot.textContent = `fx ${n2}`
+      slot.classList.toggle('loaded', n2 > 0)
+    }
   }
 
   document.addEventListener('input', (e) => {
@@ -569,7 +575,8 @@ export function attach(app) {
       const s = document.createElement('div')
       s.className = `strip${audible.has(t.id) ? '' : ' off'}`
       s.dataset.strip = t.id
-      const inserts = t.chain?.effects.filter(e => e.slug !== fx.LIMITER_SLUG).length || 0
+      // the header counts the limiter, so the slot does too
+      const inserts = t.chain?.effects.length || 0
       const reverb = t.sends?.reverb || 0
       const delay = t.sends?.delay || 0
       s.innerHTML = `<b>${escapeHtml(t.name)}</b>
@@ -911,7 +918,7 @@ export function attach(app) {
       .map(c => `<button type="button" data-cat="${c.id}" class="${c.id === fxCat.value ? 'on' : ''}">${c.label}</button>`).join('')
     $('fx-list').innerHTML = fx.FX_LIST
       .filter(e => (fxCat.value === 'all' || e.category === fxCat.value) && (!fxCat.query || e.name.toLowerCase().includes(fxCat.query)))
-      .map(e => `<button type="button" role="listitem" data-add="${e.slug}"><b>${e.name}</b><i>${e.category} · ${e.params.length} params</i></button>`).join('')
+      .map(e => `<button type="button" role="listitem" data-add="${e.slug}"><b>${e.name}</b><i>${e.category} · ${e.params.length} param${e.params.length === 1 ? '' : 's'}</i></button>`).join('')
   }
   $('fx-cats').addEventListener('click', (e) => {
     const b = e.target.closest('[data-cat]')
@@ -930,7 +937,11 @@ export function attach(app) {
     syncTrackDom(t)
     closeModal($('m-fx'))
   })
-  $('btn-fx-add').addEventListener('click', () => openModal('fx'))
+  $('btn-fx-add').addEventListener('click', () => {
+    // the add button lives inside the active track's chain, so it targets that track
+    if (!findTrack(state.fxTarget)) state.fxTarget = state.active
+    openModal('fx')
+  })
   $('btn-fx-preset-none').addEventListener('click', () => {
     const t = findTrack(state.active)
     if (!t) return
@@ -993,6 +1004,12 @@ export function attach(app) {
     }
     const fc = document.querySelector(`[data-fx-count="${t.id}"]`)
     if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
+    const slot = document.querySelector(`.strip [data-insert="${t.id}"]`)
+    if (slot) {
+      const n2 = t.chain.effects.length
+      slot.textContent = `fx ${n2}`
+      slot.classList.toggle('loaded', n2 > 0)
+    }
   }
 
   $('fx-chain').addEventListener('click', (e) => {
