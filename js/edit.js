@@ -324,7 +324,8 @@ export function install({ state, log } = {}) {
     else state.studio?.drawRoll?.()
     if (kind() === 'roll') {
       const r = state.rolls.get(state.active)
-      $('note-count').textContent = `${r?.notes.length ?? 0} roll notes`
+      const n = r?.notes.length ?? 0
+      $('note-count').textContent = `${n} roll note${n === 1 ? '' : 's'}`
     }
   }
 

@@ -807,7 +807,7 @@ export function install({ state, log } = {}) {
   function redraw() {
     state.studio?.drawRoll?.()
     if (activeRoll()) {
-      $('note-count').textContent = `${activeRoll().notes.length} roll notes`
+      $('note-count').textContent = `${activeRoll().notes.length} roll note${activeRoll().notes.length === 1 ? '' : 's'}`
       return
     }
     if (window.VS?.setState) window.VS.setState({ notes: state.notes })
