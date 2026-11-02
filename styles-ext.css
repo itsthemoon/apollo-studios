@@ -287,7 +287,7 @@
 .ic.round[aria-current="page"] { background: var(--pill-hi); color: var(--ink); }
 
 /* the take panel owns the dock height: the roll grows, the list and hint stay put */
-#p-take { display: flex; flex-direction: column; height: 100%; }
+#p-take:not([hidden]) { display: flex; flex-direction: column; height: 100%; }
 #p-take .roll-wrap { flex: 1 1 auto; min-height: 96px; }
 #p-take #roll { height: 100%; }
 

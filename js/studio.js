@@ -975,7 +975,7 @@ export function attach(app) {
   function renderChain(t) {
     const host = $('fx-chain')
     host.innerHTML = ''
-    const used = t.chain.effects.filter(e => e.slug !== fx.LIMITER_SLUG).length
+    const used = t.chain.effects.length
     const cap = t.chain.capacity ?? 8
     $('fx-capacity').textContent = used >= cap ? 'Maximum amount of effects reached' : `${used} / ${cap}`
     $('btn-fx-add').disabled = used >= cap
