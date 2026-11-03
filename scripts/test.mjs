@@ -139,6 +139,21 @@ test('export refuses junk', () => {
 })
 
 // ---- 6. static wiring ------------------------------------------------------
+// A stylesheet is only a stylesheet: the shell was once overwritten by a copy of
+// studio.js, which Chrome parsed to zero rules and rendered the app unstyled.
+test('stylesheets are CSS', () => {
+  for (const name of ['styles.css', 'styles-ext.css']) {
+    const css = readFileSync(new URL(`../${name}`, import.meta.url), 'utf8')
+    ok(!/^\s*(import|export|const|function)\s/m.test(css), `${name} carries no JS statements`)
+    ok(css.includes('{') && css.includes(':root') || name === 'styles-ext.css', `${name} defines rules`)
+    for (const line of css.split('\n')) {
+      if (line.trim().startsWith('//')) ok(false, `${name} has a // comment: ${line.trim().slice(0, 40)}`)
+    }
+    const depth = [...css].reduce((n, ch) => n + (ch === '{' ? 1 : ch === '}' ? -1 : 0), 0)
+    ok(depth === 0, `${name} braces balance`)
+  }
+})
+
 test('dom wiring', () => {
   const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8')
   const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8')
