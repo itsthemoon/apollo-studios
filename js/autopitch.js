@@ -28,14 +28,55 @@ const mod12 = (n) => ((n % 12) + 12) % 12
 
 // correctionBias scales the dial: below 1 is looser than the dial says, above
 // 1 is harder. Harmony voices are offsets in semitones, 0 = no extra voice.
+// Categories and tile names mirror the shipping product exactly.
+const tile = (category, slug, name, tier, bias, harmony = 0, duet = false) =>
+  Object.freeze({ category, slug, name, tier, duet, harmonySemitones: harmony, correctionBias: bias })
+
 export const PRESETS = Object.freeze([
-  Object.freeze({ slug: 'classic', name: 'Classic', tier: 'free', duet: false, harmonySemitones: 0, correctionBias: 1 }),
-  Object.freeze({ slug: 'duet', name: 'Duet', tier: 'free', duet: true, harmonySemitones: 0, correctionBias: 0.85 }),
-  Object.freeze({ slug: 'big-harmony', name: 'Big Harmony', tier: 'free', duet: false, harmonySemitones: 12, correctionBias: 0.9 }),
-  Object.freeze({ slug: 'natural', name: 'Natural', tier: 'membership', duet: false, harmonySemitones: 0, correctionBias: 0.55 }),
-  Object.freeze({ slug: 'third', name: 'Third', tier: 'membership', duet: false, harmonySemitones: 4, correctionBias: 0.8 }),
-  Object.freeze({ slug: 'chip', name: 'Chip', tier: 'membership', duet: false, harmonySemitones: 12, correctionBias: 1.15 }),
+  tile('essentials', 'classic', 'Classic', 'free', 1),
+  tile('essentials', 'duet', 'Duet', 'free', 0.85, 0, true),
+  tile('essentials', 'big-harmony', 'Big Harmony', 'free', 0.9, 12),
+  tile('essentials', 'natural', 'Natural', 'membership', 0.55),
+  tile('essentials', 'third', 'Third', 'membership', 0.8, 4),
+  tile('essentials', 'chip', 'Chip', 'membership', 1.15, 12),
+  tile('hip-hop', 'modern-rap', 'Modern Rap', 'free', 1),
+  tile('hip-hop', 'stone', 'Stone', 'free', 0.95),
+  tile('hip-hop', 'yummy', 'Yummy', 'free', 0.9),
+  tile('hip-hop', 'play-card', 'Play Card', 'membership', 0.85),
+  tile('hip-hop', 'ocean', 'Ocean', 'membership', 0.8),
+  tile('hip-hop', 'telephone', 'Telephone', 'membership', 0.75),
+  tile('hyperpop', 'simulacrum', 'Simulacrum', 'free', 1.1),
+  tile('hyperpop', 'ultrashift', 'Ultrashift', 'free', 1.2),
+  tile('hyperpop', 'hyper', 'Hyper', 'free', 1.25),
+  tile('hyperpop', 'bitz', 'Bitz', 'membership', 1.3),
+  tile('hyperpop', 'amped', 'Amped', 'membership', 1.35),
+  tile('hyperpop', 'applex', 'AppleX', 'membership', 1.4),
+  tile('sci-fi', 'robot', 'Robot', 'free', 1.15),
+  tile('sci-fi', 'futurescape', 'Futurescape', 'membership', 1),
+  tile('sci-fi', 'krafty', 'Krafty', 'membership', 0.9),
+  tile('sci-fi', 'gorgon', 'Gorgon', 'free', 1.05),
+  tile('sci-fi', 'halo', 'Halo', 'free', 0.95),
+  tile('sci-fi', 'drone', 'Drone', 'free', 1.1),
+  tile('custom', 'custom-1', 'Custom 1', 'free', 1),
+  tile('custom', 'custom-2', 'Custom 2', 'free', 1),
+  tile('custom', 'custom-3', 'Custom 3', 'free', 1),
+  tile('custom', 'custom-4', 'Custom 4', 'free', 1),
+  tile('custom', 'custom-5', 'Custom 5', 'free', 1),
+  tile('custom', 'custom-6', 'Custom 6', 'free', 1),
 ])
+
+// Category dropdown order, matching the product.
+export const CATEGORIES = Object.freeze([
+  Object.freeze({ slug: 'essentials', name: 'Essentials' }),
+  Object.freeze({ slug: 'hip-hop', name: 'Hip Hop' }),
+  Object.freeze({ slug: 'hyperpop', name: 'Hyperpop' }),
+  Object.freeze({ slug: 'sci-fi', name: 'Sci-Fi' }),
+  Object.freeze({ slug: 'custom', name: 'Custom' }),
+])
+
+export function presetsFor(category) {
+  return PRESETS.filter((p) => p.category === category)
+}
 
 // Twelve tonic buttons, C first.
 export const TONIC_GRID = Object.freeze(
@@ -46,20 +87,31 @@ export const TONIC_GRID = Object.freeze(
 
 // Semitone offsets from the tonic, one octave. Chromatic is the default so an
 // untouched panel does not silently retune anything.
+// The five scales the product offers, plus "Project key", which borrows the
+// project's own key at apply time instead of carrying degrees of its own.
 export const SCALES = Object.freeze({
   chromatic: Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
   major: Object.freeze([0, 2, 4, 5, 7, 9, 11]),
   minor: Object.freeze([0, 2, 3, 5, 7, 8, 10]),
-  dorian: Object.freeze([0, 2, 3, 5, 7, 9, 10]),
-  mixolydian: Object.freeze([0, 2, 4, 5, 7, 9, 10]),
-  pentatonic: Object.freeze([0, 2, 4, 7, 9]),
+  majorPentatonic: Object.freeze([0, 2, 4, 7, 9]),
+  minorPentatonic: Object.freeze([0, 3, 5, 7, 10]),
+  project: Object.freeze([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
+})
+
+export const SCALE_LABELS = Object.freeze({
+  chromatic: 'Chromatic',
+  major: 'Major',
+  minor: 'Minor',
+  majorPentatonic: 'Major Pentatonic',
+  minorPentatonic: 'Minor Pentatonic',
+  project: 'Project key',
 })
 
 export const SCALE_NAMES = Object.freeze(Object.keys(SCALES))
 
 // Detection preference order. Pentatonic sits late and chromatic last: the
 // denser the scale, the bigger the coverage penalty it carries.
-const DETECT_ORDER = Object.freeze(['major', 'minor', 'dorian', 'mixolydian', 'pentatonic', 'chromatic'])
+const DETECT_ORDER = Object.freeze(['major', 'minor', 'majorPentatonic', 'minorPentatonic', 'chromatic'])
 const COVERAGE_PENALTY = 0.02
 
 export function presetBySlug(slug) {
@@ -75,12 +127,18 @@ export function createState(init = {}) {
   const preset = presetBySlug(o.preset) ? o.preset : 'classic'
   return clampState({
     preset,
+    category: presetBySlug(preset).category,
+    enabled: o.enabled ?? false,
     strength: o.strength ?? DEFAULT_STRENGTH,
     scale: o.scale ?? 'chromatic',
     tonic: o.tonic ?? 0,
     autoDetect: o.autoDetect ?? true,
     formant: o.formant ?? 0,
     humanise: o.humanise ?? 0.5,
+    algorithm: o.algorithm === 'harmony' ? 'harmony' : 'original',
+    harmonyMix: clamp01(o.harmonyMix ?? 1),
+    projectScale: Object.hasOwn(SCALES, o.projectScale) ? o.projectScale : 'minor',
+    projectTonic: Number.isInteger(o.projectTonic) ? mod12(o.projectTonic) : 0,
   })
 }
 
@@ -91,16 +149,50 @@ export function clampState(state) {
   const tonic = Number.isInteger(s.tonic) ? mod12(s.tonic) : 0
   return {
     preset: presetBySlug(s.preset) ? s.preset : 'classic',
+    category: CATEGORIES.some((c) => c.slug === s.category)
+      ? s.category
+      : (presetBySlug(s.preset) ?? presetBySlug('classic')).category,
+    enabled: Boolean(s.enabled),
     strength: clamp01(s.strength ?? DEFAULT_STRENGTH),
     scale: Object.hasOwn(SCALES, s.scale) ? s.scale : 'chromatic',
     tonic,
     autoDetect: Boolean(s.autoDetect),
     formant: clamp(clean(s.formant), -FORMANT_LIMIT, FORMANT_LIMIT),
     humanise: clamp01(s.humanise ?? 0.5),
+    algorithm: s.algorithm === 'harmony' ? 'harmony' : 'original',
+    harmonyMix: clamp01(s.harmonyMix ?? 1),
+    projectScale: Object.hasOwn(SCALES, s.projectScale) ? s.projectScale : 'minor',
+    projectTonic: Number.isInteger(s.projectTonic) ? mod12(s.projectTonic) : 0,
   }
 }
 
 // ---- setters ---------------------------------------------------------------
+
+export function setEnabled(state, on) {
+  return assign(state, clampState({ ...clampState(state), enabled: Boolean(on) }))
+}
+
+export function setCategory(state, slug) {
+  if (!CATEGORIES.some((c) => c.slug === slug)) throw new Error('unknown autopitch category')
+  const first = presetsFor(slug)[0]
+  return assign(state, clampState({ ...clampState(state), category: slug, preset: first ? first.slug : state.preset }))
+}
+
+export function setAlgorithm(state, algorithm) {
+  return assign(state, clampState({ ...clampState(state), algorithm: algorithm === 'harmony' ? 'harmony' : 'original' }))
+}
+
+export function setHarmonyMix(state, value) {
+  return assign(state, clampState({ ...clampState(state), harmonyMix: value }))
+}
+
+export function setProjectKey(state, tonic, scale) {
+  return assign(state, clampState({
+    ...clampState(state),
+    projectTonic: Number.isInteger(tonic) ? tonic : state.projectTonic,
+    projectScale: Object.hasOwn(SCALES, scale) ? scale : state.projectScale,
+  }))
+}
 
 export function setPreset(state, slug) {
   if (!presetBySlug(slug)) throw new Error('unknown autopitch preset')
@@ -211,8 +303,13 @@ export function liveShift(note, state) {
 export function applyToNotes(notes, state) {
   if (!Array.isArray(notes)) throw new Error('notes must be an array')
   const s = clampState(state)
+  // the switch is real: off means the take plays as recorded
+  if (!s.enabled) return notes.map((n) => ({ ...n, shift: 0, cents: 0 }))
   const preset = presetBySlug(s.preset)
   const amount = clamp01(s.strength * preset.correctionBias)
+  // "Project key" borrows the project's own key and scale
+  const tonic = s.scale === 'project' ? s.projectTonic : s.tonic
+  const scale = s.scale === 'project' ? s.projectScale : s.scale
   return notes.map((note) => {
     // The recorded take pitch, not whatever a previous pass left in `hz`, so
     // tuning twice lands in the same place instead of stacking.
@@ -221,7 +318,7 @@ export function applyToNotes(notes, state) {
     const orig = Number.isFinite(note.origMidi) ? note.origMidi
       : Number.isFinite(note.snappedFrom) ? note.snappedFrom : noteMidi(note)
     if (orig === null) return { ...note }
-    const target = nearestInScale(orig, s.tonic, s.scale)
+    const target = nearestInScale(orig, tonic, scale)
     const midi = orig + amount * (target - orig)
     const out = {
       ...note,
@@ -231,9 +328,11 @@ export function applyToNotes(notes, state) {
       shift: round6(midi - orig),
       snappedFrom: orig,
     }
-    if (preset.harmonySemitones !== 0) {
+    // a harmony voice only sounds when the advanced algorithm asks for one
+    if (preset.harmonySemitones !== 0 && s.algorithm === 'harmony' && s.harmonyMix > 0) {
       out.harmonyMidi = midi + preset.harmonySemitones
       out.harmonyHz = midiToHz(out.harmonyMidi)
+      out.harmonyMix = s.harmonyMix
     }
     return out
   })

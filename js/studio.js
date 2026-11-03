@@ -11,6 +11,7 @@ import * as library from './library.js'
 import * as versions from './versions.js'
 import * as mastering2 from './mastering2.js'
 import * as shifter from './shifter.js'
+import * as icons from './icons.js'
 import * as autopitch from './autopitch.js'
 import * as shortcuts from './shortcuts.js'
 import * as fx from './fx.js'
@@ -1074,79 +1075,84 @@ export function attach(app) {
   }
 
   // ---------------------------------------------------------------- AutoPitch
-  $('ap-presets').innerHTML = autopitch.PRESETS.map((p, i) =>
-    `<button type="button" data-ap="${p.slug}" class="${p.tier === 'membership' ? 'locked' : ''}">${p.name}${i === 0 ? '<em class="new">New</em>' : ''}</button>`).join('')
-  $('tonic-grid').innerHTML = autopitch.TONIC_GRID.map(t =>
-    `<button type="button" data-tonic="${t.pitchClass}" aria-label="${t.name}">${t.name}</button>`).join('')
-  $('in-ap-scale').innerHTML = autopitch.SCALE_NAMES.map(n => `<option value="${n}">${n}</option>`).join('')
+  // Layout and wording follow the shipping product: a power switch, a category
+  // dropdown over a tile grid, a Heaviest knob, a scale dropdown over a piano
+  // key grid, and an advanced strip behind the sliders button. There is no
+  // Apply — the panel is live, so every control re-pitches sounding notes.
+  const KNOWN_NAMES = ['C', 'C\u266F', 'D', 'D\u266F', 'E', 'F', 'F\u266F', 'G', 'G\u266F', 'A', 'A\u266F', 'B']
+  const KNOB_LABELS = [[0, 'Off'], [0.15, 'Light'], [0.4, 'Medium'], [0.7, 'Firm'], [0.9, 'Heaviest']]
+  const knobLabel = (v) => KNOB_LABELS.filter(([at]) => v >= at).pop()[1]
 
   function paintAp() {
     const s = state.apState
+    $('ap-power').setAttribute('aria-checked', String(s.enabled))
+    $('out-ap-category').textContent = autopitch.CATEGORIES.find(c => c.slug === s.category).name
+    $('out-ap-scale').textContent = autopitch.SCALE_LABELS[s.scale]
+    $('in-ap-scale')?.replaceChildren()
+    const pct = Math.round(s.strength * 100)
+    $('in-ap-strength').value = String(pct)
+    $('knob-ap').setAttribute('aria-valuenow', String(pct))
+    $('knob-ap').querySelector('.needle').style.transform =
+      `rotate(${-135 + 2.7 * pct}deg)`
+    $('out-ap-strength').textContent = pct === 0 ? 'Off' : (pct > 92 ? 'Heaviest' : knobLabel(s.strength))
     document.querySelectorAll('[data-ap]').forEach(b => {
       const on = b.dataset.ap === s.preset
       b.classList.toggle('on', on)
       b.setAttribute('aria-pressed', String(on))
     })
     document.querySelectorAll('[data-tonic]').forEach(b => {
-      const on = Number(b.dataset.tonic) === s.tonic
-      b.classList.toggle('on', on)
-      b.setAttribute('aria-pressed', String(on))
+      const pc = Number(b.dataset.tonic)
+      const scaleName = s.scale === 'project' ? s.projectScale : s.scale
+      const degrees = autopitch.SCALES[scaleName]
+      const root = s.scale === 'project' ? s.projectTonic : s.tonic
+      const inScale = degrees.length === 12 || degrees.includes((pc - root + 12) % 12)
+      b.classList.toggle('root', pc === (s.scale === 'project' ? s.projectTonic : s.tonic))
+      b.classList.toggle('in-scale', inScale)
+      b.setAttribute('aria-pressed', String(pc === s.tonic))
     })
-    $('in-ap-scale').value = s.scale
-    $('in-ap-strength').value = String(Math.round(s.strength * 100))
-    $('out-ap-strength').textContent = `${Math.round(s.strength * 100)} %`
+    document.querySelectorAll('#knob-ap .ticks line').forEach((line, i) => {
+      line.classList.toggle('on', i / 30 <= s.strength + 0.001)
+    })
+    $('ap-category').setAttribute('aria-expanded', String(!$('ap-cat-menu').hidden))
+    $('ap-scale').setAttribute('aria-expanded', String(!$('ap-scale-menu').hidden))
+    $('in-ap-algorithm').value = s.algorithm
+    $('in-ap-harmonymix').value = String(Math.round(s.harmonyMix * 100))
+    $('out-ap-harmonymix').textContent = `${Math.round(s.harmonyMix * 100)}%`
   }
-  $('ap-presets').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-ap]')
-    if (!b) return
-    const p = autopitch.presetBySlug(b.dataset.ap)
-    if (autopitch.isMembership(p) && !state.member) { app.log(`${p.name} needs Apollo Pro`); openModal('get'); return }
-    autopitch.setPreset(state.apState, b.dataset.ap)
-    paintAp()
-    app.liveRefresh()
-  })
-  $('tonic-grid').addEventListener('click', (e) => {
-    const b = e.target.closest('[data-tonic]')
-    if (!b) return
-    autopitch.setTonic(state.apState, Number(b.dataset.tonic))
-    paintAp()
-    app.liveRefresh()
-  })
-  $('in-ap-strength').addEventListener('input', (e) => {
-    autopitch.setStrength(state.apState, Number(e.target.value) / 100)
-    $('out-ap-strength').textContent = `${e.target.value}%`
-    app.liveRefresh()
-  })
-  $('in-ap-scale').addEventListener('change', (e) => {
-    autopitch.setScale(state.apState, e.target.value)
-    app.log(`scale ${e.target.value}`)
-    app.liveRefresh()
-  })
-  $('btn-autodetect').addEventListener('click', () => {
-    const res = autopitch.detectKey(state.notes.map(n => n.midi))
-    if (res.confidence < 0.2) { app.log('autodetect: not enough confident notes'); return }
-    autopitch.setTonic(state.apState, res.tonic)
-    autopitch.setScale(state.apState, res.scale)
-    paintAp()
-    app.liveRefresh()
-    app.log(`autodetect: ${NAMES[res.tonic]} ${res.scale} (${Math.round(res.confidence * 100)}%)`)
-  })
-  $('btn-autopitch').addEventListener('click', () => {
-    app.syncTuning()   // editor snap first, so autopitch has the last word
-    const tuned = autopitch.applyToNotes(state.notes, state.apState)
-    tuned.forEach((n, i) => {
-      state.notes[i].midi = n.midi
-      state.notes[i].cents = n.cents
-      state.notes[i].hz = n.hz
-      state.notes[i].shift = n.shift
-      state.notes[i].snappedFrom = n.snappedFrom
-    })
-    app.renderNotes()
-    drawRoll()
-    app.log(`autopitch: ${tuned.length} notes at ${Math.round(state.apState.strength * 100)}%`)
-    app.liveRefresh()
-  })
 
+  // 31 ticks over the 270 degree sweep, drawn once; `paintAp` lights them
+  ;(() => {
+    const svg = document.querySelector('#knob-ap .ticks')
+    const ns = 'http://www.w3.org/2000/svg'
+    for (let i = 0; i < 31; i++) {
+      const a = (-135 + i * 9) * Math.PI / 180
+      const r1 = 62, r2 = i % 5 === 0 ? 55 : 58
+      const line = document.createElementNS(ns, 'line')
+      line.setAttribute('x1', String(70 + Math.sin(a) * r1))
+      line.setAttribute('y1', String(70 - Math.cos(a) * r1))
+      line.setAttribute('x2', String(70 + Math.sin(a) * r2))
+      line.setAttribute('y2', String(70 - Math.cos(a) * r2))
+      svg.appendChild(line)
+    }
+  })()
+
+  function paintCategory() {
+    $('ap-cat-menu').innerHTML = autopitch.CATEGORIES.map(c =>
+      `<button type="button" role="option" data-cat="${c.slug}" aria-selected="${c.slug === state.apState.category}">${c.name}</button>`).join('')
+    $('ap-scale-menu').innerHTML = autopitch.SCALE_NAMES.map(n =>
+      `<button type="button" role="option" data-scale="${n}" aria-selected="${n === state.apState.scale}">${autopitch.SCALE_LABELS[n]}</button>`).join('')
+  }
+
+  function paintTiles() {
+    $('ap-presets').innerHTML = autopitch.presetsFor(state.apState.category).map(p =>
+      `<button type="button" class="ap-tile" data-ap="${p.slug}" aria-pressed="false"><span class="ic" data-icon="${p.duet ? 'duet' : 'autopitch'}" aria-hidden="true"></span>${p.name}${p.tier === 'membership' ? '<span class="crown" aria-label="Apollo Pro">\u2665</span>' : ''}</button>`).join('')
+    icons.hydrate($('ap-presets'))
+  }
+
+  $('tonic-grid').innerHTML = [
+    ...autopitch.TONIC_GRID.filter(t => t.name.includes(' ')),
+    ...autopitch.TONIC_GRID.filter(t => !t.name.includes(' ')),
+  ].map(t => `<button type="button" data-tonic="${t.pitchClass}" class="${t.name.includes(' ') ? 'acc' : 'nat'}" aria-label="${t.name.replace(' ', ' / ')}">${t.name.replace(' ', '<br>')}</button>`).join('')
   // ---------------------------------------------------------------- mastering
   $('master-presets').innerHTML = mastering2.PRESETS.map(p =>
     `<button type="button" data-mpreset="${p.slug}" title="${p.desc}">${p.name}</button>`).join('')
@@ -1205,6 +1211,110 @@ export function attach(app) {
     app.log(`reference analysed: low ${res.low.toFixed(1)}, mid ${res.mid.toFixed(1)}, high ${res.high.toFixed(1)} dB`)
     e.target.value = ''
   })
+
+  // ---------------------------------------  paintCategory()
+  paintTiles()
+  paintAp()
+
+  $('ap-category').addEventListener('click', () => {
+    $('ap-scale-menu').hidden = true
+    $('ap-cat-menu').hidden = !$('ap-cat-menu').hidden
+    paintAp()
+  })
+  $('ap-scale').addEventListener('click', () => {
+    $('ap-cat-menu').hidden = true
+    $('ap-scale-menu').hidden = !$('ap-scale-menu').hidden
+    paintAp()
+  })
+  $('ap-cat-menu').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-cat]')
+    if (!b) return
+    autopitch.setCategory(state.apState, b.dataset.cat)
+    $('ap-cat-menu').hidden = true
+    paintCategory()
+    paintTiles()
+    paintAp()
+    app.liveRefresh()
+    app.log(`autopitch category ${b.textContent}`)
+  })
+  $('ap-scale-menu').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-scale]')
+    if (!b) return
+    autopitch.setScale(state.apState, b.dataset.scale)
+    $('ap-scale-menu').hidden = true
+    paintCategory()
+    paintAp()
+    app.liveRefresh()
+    app.log(`scale ${b.textContent}`)
+  })
+  $('ap-presets').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ap]')
+    if (!b) return
+    const p = autopitch.presetBySlug(b.dataset.ap)
+    if (autopitch.isMembership(p) && !state.member) { app.log(`${p.name} needs Apollo Pro`); openModal('get'); return }
+    autopitch.setPreset(state.apState, b.dataset.ap)
+    autopitch.setEnabled(state.apState, true)
+    paintAp()
+    app.liveRefresh()
+  })
+  $('tonic-grid').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-tonic]')
+    if (!b) return
+    autopitch.setTonic(state.apState, Number(b.dataset.tonic))
+    paintAp()
+    app.liveRefresh()
+  })
+  $('ap-power').addEventListener('click', () => {
+    autopitch.setEnabled(state.apState, !state.apState.enabled)
+    paintAp()
+    app.liveRefresh()
+    app.log(`autopitch ${state.apState.enabled ? 'on' : 'off'}`)
+  })
+  $('btn-ap-adv').addEventListener('click', () => {
+    const adv = $('ap-adv')
+    adv.hidden = !adv.hidden
+    $('btn-ap-adv').setAttribute('aria-expanded', String(!adv.hidden))
+  })
+  $('in-ap-algorithm').addEventListener('change', (e) => {
+    autopitch.setAlgorithm(state.apState, e.target.value)
+    app.liveRefresh()
+  })
+  $('in-ap-harmonymix').addEventListener('input', (e) => {
+    autopitch.setHarmonyMix(state.apState, Number(e.target.value) / 100)
+    $('out-ap-harmonymix').textContent = `${e.target.value}%`
+    app.liveRefresh()
+  })
+
+  // the knob: drag vertically, wheel, or arrow keys
+  ;(() => {
+    const knob = $('knob-ap')
+    let from = 0, startY = 0, dragging = false
+    const set = (v) => {
+      autopitch.setStrength(state.apState, Math.max(0, Math.min(1, v)))
+      paintAp()
+      app.liveRefresh()
+    }
+    knob.addEventListener('pointerdown', (e) => {
+      dragging = true
+      startY = e.clientY
+      from = state.apState.strength
+      knob.setPointerCapture(e.pointerId)
+    })
+    knob.addEventListener('pointermove', (e) => {
+      if (!dragging) return
+      set(from + (startY - e.clientY) / 160)
+    })
+    knob.addEventListener('pointerup', () => { dragging = false })
+    knob.addEventListener('wheel', (e) => {
+      e.preventDefault()
+      set(state.apState.strength - Math.sign(e.deltaY) * 0.04)
+    }, { passive: false })
+    knob.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 0.1 : 0.02
+      if (e.key === 'ArrowUp' || e.key === 'ArrowRight') { set(state.apState.strength + step); e.preventDefault() }
+      if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') { set(state.apState.strength - step); e.preventDefault() }
+    })
+  })()
 
   // ---------------------------------------------------------------- lyrics, chat, versions
   $('in-lyrics').addEventListener('input', () => { $('lyrics-count').textContent = `${$('in-lyrics').value.split('\n').filter(Boolean).length} lines` })

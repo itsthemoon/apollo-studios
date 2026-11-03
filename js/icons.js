@@ -8,7 +8,7 @@ const NAMES = [
   'crown', 'save', 'chevron-down', 'music', 'headphones', 'automation', 'dot-circle',
   'dots-v', 'dots-h', 'snap', 'stretch', 'skip-back', 'skip-forward', 'mute', 'solo', 'create',
   'export', 'download', 'history', 'lyrics', 'sounds', 'shortcuts', 'invite',
-  'autopitch', 'mixer', 'copy', 'trash', 'reverse', 'droplet', 'settings', 'file-plus', 'repeat',
+  'autopitch', 'duet', 'mixer', 'copy', 'trash', 'reverse', 'droplet', 'settings', 'file-plus', 'repeat',
   'addtrack', 'arm', 'editor', 'mastering', 'versions', 'publish'
 ]
 
@@ -74,6 +74,7 @@ const PATHS = {
   shortcuts: '<rect x="2.5" y="5.5" width="15" height="9" rx="2"/><path d="M5.5 9h1.2M8.5 9h1.2M11.5 9h1.2M14.5 9h.5M6 12.2h8"/>',
   invite: '<circle cx="7.8" cy="7.5" r="2.8"/><path d="M2.5 16.5c0-2.7 2.4-4.2 5.3-4.2"/><path d="M15 9.5v5M12.5 12h5"/>',
   autopitch: '<path d="M6 15.5V5.5l7-1.4v9.4"/><circle cx="4.3" cy="15.8" r="1.8"/><path d="M14.5 5.4l.9 2 2 .9-2 .9-.9 2-.9-2-2-.9 2-.9z"/>',
+  duet: '<circle cx="6" cy="7" r="2.4"/><circle cx="13.4" cy="7" r="2.4"/><path d="M1.9 16.2c0-2.4 1.8-4 4.1-4s4.1 1.6 4.1 4M9.3 16.2c0-2.4 1.8-4 4.1-4s4.1 1.6 4.1 4"/>',
   mixer: '<path d="M5 3v5.5M5 12.5V17M10 3v3.5M10 10.5V17M15 3v8.5M15 15.5V17"/><circle cx="5" cy="10" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="15" cy="13" r="1.5"/>',
   copy: '<rect x="6.5" y="6.5" width="10" height="10" rx="2.2"/><path d="M13 6.5V5.2A1.7 1.7 0 0 0 11.3 3.5H5.2A1.7 1.7 0 0 0 3.5 5.2v6.1A1.7 1.7 0 0 0 5.2 13H6.5"/>',
   trash: '<path d="M3.5 5.8h13"/><path d="M7.5 5.8V3.8h5v2"/><path d="M5.5 5.8 6.4 16.2h7.2l.9-10.4"/><path d="M8.6 8.8v4.4M11.4 8.8v4.4"/>',

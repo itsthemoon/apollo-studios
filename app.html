@@ -174,7 +174,7 @@
 
     <div class="scale-strip">
       <label class="key">Scale <select id="in-scale" aria-label="Scale"></select></label>
-      <span class="hint">notes follow the key and snap; the take is always editable</span>
+      <span class="hint">editor snap</span>
     </div>
   </section>
 
@@ -219,30 +219,56 @@
       <p class="hint">Each row can be deleted. The snap slider at the top of the lane sets how hard the take is pulled to the key.</p>
     </section>
 
-    <section class="panel" id="p-harmony" role="tabpanel" aria-labelledby="tab-harmony" hidden>
-      <div class="panel-head"><h2>AutoPitch&trade; <em class="ai">AI</em></h2>
-        <button class="pill" type="button" id="btn-autodetect">AutoDetect Key</button></div>
-      <div class="row"><span class="chiprow" id="ap-presets" role="group" aria-label="AutoPitch preset"></span></div>
-      <div class="row">
-        <label class="dial">Heaviest <input id="in-ap-strength" type="range" min="0" max="100" value="60" aria-label="Correction strength"><output id="out-ap-strength">60%</output></label>
-        <label>Category <select id="in-ap-category">
-          <option value="Essentials" selected>Essentials</option><option value="Chords">Chords</option><option value="Effects">Effects</option>
-        </select></label>
+    <section class="panel ap" id="p-harmony" role="tabpanel" aria-labelledby="tab-harmony" hidden>
+      <div class="ap-head">
+        <button class="power" type="button" role="switch" id="ap-power" aria-checked="false" aria-label="AutoPitch on"></button>
+        <h2>AutoPitch&trade;</h2>
+        <button class="pill" type="button" id="btn-autodetect">AutoDetect Key</button>
+        <button class="iconbtn dot" type="button" id="btn-ap-adv" aria-label="Advanced Settings" aria-expanded="false"><span data-icon="sliders" aria-hidden="true"></span></button>
       </div>
-      <div class="row">
-        <label>Scale <select id="in-ap-scale" aria-label="AutoPitch scale"></select></label>
-        <label class="file ghost" role="button" tabindex="0">Advanced Settings<input id="file-ap-advanced" type="file" accept=".json" hidden aria-label="AutoPitch advanced settings"></label>
+      <div class="ap-body">
+        <div class="ap-cell">
+          <div class="ap-dd">
+            <span class="ap-label" id="ap-cat-label">Category</span>
+            <button class="select" type="button" id="ap-category" aria-labelledby="ap-cat-label" aria-expanded="false"><span id="out-ap-category">Essentials</span><span class="chev" aria-hidden="true"></span></button>
+            <div class="ap-menu" id="ap-cat-menu" role="listbox" aria-labelledby="ap-cat-label" hidden></div>
+          </div>
+          <div class="ap-tiles" id="ap-presets" role="group" aria-label="AutoPitch preset"></div>
+        </div>
+        <div class="ap-cell ap-knob">
+          <div class="knob" id="knob-ap" role="slider" tabindex="0" aria-label="Correction amount" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><svg class="ticks" viewBox="0 0 140 140" aria-hidden="true"></svg><span class="needle" aria-hidden="true"></span></div>
+          <output class="knob-label" id="out-ap-strength">Heaviest</output>
+          <input id="in-ap-strength" type="range" min="0" max="100" value="100" aria-label="Correction amount" hidden>
+        </div>
+        <div class="ap-cell ap-keys">
+          <div class="ap-dd">
+            <span class="ap-label" id="ap-scale-label">Scale</span>
+            <button class="select" type="button" id="ap-scale" aria-labelledby="ap-scale-label" aria-expanded="false"><span id="out-ap-scale">Minor</span><span class="chev" aria-hidden="true"></span></button>
+            <div class="ap-menu" id="ap-scale-menu" role="listbox" aria-labelledby="ap-scale-label" hidden></div>
+          </div>
+          <div class="piano" id="tonic-grid" role="group" aria-label="Key"></div>
+        </div>
       </div>
-      <div class="tonic-grid" id="tonic-grid" role="group" aria-label="Tonic"></div>
-      <div class="row">
-        <button id="btn-autopitch" class="pill primary" type="button">Apply AutoPitch</button>
-        <span class="hint">presets marked ♥ need membership; the take itself is never overwritten</span>
+      <div class="ap-adv" id="ap-adv" hidden>
+        <label class="ap-alg">Algorithm
+          <span class="select-wrap">
+            <select id="in-ap-algorithm">
+              <option value="original" selected>Original</option>
+              <option value="harmony">Harmony</option>
+            </select>
+          </span>
+        </label>
+        <span class="ap-sep" aria-hidden="true"></span>
+        <label class="ap-mix">Harmony Mix
+          <input id="in-ap-harmonymix" type="range" min="0" max="100" value="100" aria-label="Harmony mix"><output id="out-ap-harmonymix">100%</output>
+        </label>
       </div>
-      <div class="row">
+      <p class="ap-banner"><span aria-hidden="true">&#128081;</span> Unlock advanced AutoPitch settings as well as other Studio features with Apollo Pro.</p>
+      <div class="ap-extra" hidden>
         <label>Harmony <select id="in-harmony"></select></label>
         <button id="btn-harmony" class="pill" type="button">Build harmonies</button>
+        <div id="harmony-list" class="notes" role="list" aria-label="Harmony rows"></div>
       </div>
-      <div id="harmony-list" class="notes" role="list" aria-label="Harmony rows"></div>
     </section>
 
     <section class="panel" id="p-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
