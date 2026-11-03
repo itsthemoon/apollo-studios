@@ -866,7 +866,8 @@ function renderHarmonies() {
     row.querySelector('button').addEventListener('click', guard(() => previewHarmony(i)))
     host.append(row)
   })
-  $('harmony-state').textContent = state.harmonies.length ? `${state.harmonies.length} sets` : 'no sets'
+  const hs = $('harmony-state')
+  if (hs) hs.textContent = state.harmonies.length ? `${state.harmonies.length} sets` : 'no sets'
 }
 
 function buildHarmonies() {
@@ -894,7 +895,8 @@ function applyCharacter() {
   keepTake(out, state.sampleRate)
   state.notes = pitch.detectNotes(out, state.sampleRate).map(n => ({ ...n, origMidi: n.midi }))
   state.selected = null
-  $('voice-state').textContent = name
+  const vs = $('voice-state')
+  if (vs) vs.textContent = name
   $('mic-state').textContent = `character: ${name}`
   resetHarmonies()
   const barSeconds = (60 / Number($('in-bpm').value)) * 4
