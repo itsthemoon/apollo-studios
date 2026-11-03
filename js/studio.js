@@ -2320,6 +2320,15 @@ export function attach(app) {
     $('metro-countin').textContent = state.countIn ? `${state.countIn} bar${state.countIn === 1 ? '' : 's'}` : 'off'
   })
 
+  $('in-grid').parentElement.hidden = false
+  $('in-snap').parentElement.hidden = false
+  $('btn-snap').addEventListener('click', () => {
+    const on = $('btn-snap').getAttribute('aria-pressed') !== 'true'
+    $('btn-snap').setAttribute('aria-pressed', String(on))
+    $('in-grid').parentElement.hidden = !on
+    $('in-snap').parentElement.hidden = !on
+    app.log(`snap ${on ? 'on' : 'off'}`)
+  })
   $('btn-stretch').addEventListener('click', () => {
     state.stretch = !state.stretch
     $('btn-stretch').setAttribute('aria-pressed', String(state.stretch))

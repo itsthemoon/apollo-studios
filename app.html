@@ -19,9 +19,7 @@
 
     <span class="hdr-right">
       <span class="saved"><span>Last saved</span><b id="saved-at">Never</b></span>
-      <button class="pill ghost tiny" type="button" data-menu="create" aria-label="Create"><span data-icon="create" aria-hidden="true"></span>Create</button>
-      <button class="pill ghost tiny" type="button" id="btn-open-wrap"><label class="file" role="button" tabindex="0">Open<input id="file-project" type="file" accept=".json,application/json" hidden aria-label="Open a project file"></label></button>
-      <button id="btn-save" class="ic round" type="button" aria-label="Save"><span data-icon="save" aria-hidden="true"></span></button>
+      <button id="btn-save" class="pill ghost tiny" type="button" aria-label="Save"><span data-icon="save" aria-hidden="true"></span>Save</button>
       <button class="pill publish" type="button" id="btn-publish"><span aria-hidden="true" data-icon="globe"></span>Publish</button>
     </span>
   </div>
@@ -124,17 +122,16 @@
         <span class="loop-region" id="loop-region" hidden></span>
       </div>
       <div class="ruler-tools">
-        <label class="snap"><span data-icon="snap" aria-hidden="true"></span>
-          <input id="in-snap" type="range" min="0" max="100" value="100" aria-label="Snap strength"><output id="out-snap">100%</output>
-        </label>
-        <label class="gridsel"><select id="in-grid" aria-label="Snap grid">
+        <button class="ic" type="button" id="btn-snap" aria-label="Snap to grid" aria-pressed="true"><span data-icon="snap" aria-hidden="true"></span></button>
+        <button class="ic" type="button" aria-label="Zoom out" id="btn-zoom-out"><span data-icon="zoom-out" aria-hidden="true"></span></button>
+        <button class="ic" type="button" aria-label="Zoom in" id="btn-zoom-in"><span data-icon="zoom-in" aria-hidden="true"></span></button>
+        <label class="gridsel" hidden><select id="in-grid" aria-label="Snap grid">
           <option value="0">off</option><option value="0.25">1/16</option><option value="0.5">1/8</option>
           <option value="1" selected>1/4</option><option value="4">bar</option>
         </select></label>
+        <label class="snap" hidden><input id="in-snap" type="range" min="0" max="100" value="100" aria-label="Snap strength"><output id="out-snap">100%</output></label>
         <button class="ic" type="button" aria-label="Split region at playhead" id="btn-split-region"><span data-icon="scissors" aria-hidden="true"></span></button>
         <button class="ic" type="button" aria-label="Toggle region stretch mode" id="btn-stretch" aria-pressed="false"><span data-icon="stretch" aria-hidden="true"></span></button>
-        <button class="ic" type="button" aria-label="Zoom out" id="btn-zoom-out"><span data-icon="zoom-out" aria-hidden="true"></span></button>
-        <button class="ic" type="button" aria-label="Zoom in" id="btn-zoom-in"><span data-icon="zoom-in" aria-hidden="true"></span></button>
       </div>
     </div>
 
@@ -527,6 +524,7 @@
 </div>
 
 <div class="menu" id="menu-app" role="menu" hidden>
+  <button role="menuitem" type="button" id="btn-open-wrap"><label class="file" role="button" tabindex="0"><span data-icon="folder" aria-hidden="true"></span>Open a project<input id="file-project" type="file" accept=".json,application/json" hidden aria-label="Open a project file"></label></button>
   <button role="menuitem" type="button" data-panel-open="p-master"><span data-icon="music" aria-hidden="true"></span>Mastering</button>
   <button role="menuitem" type="button" data-drawer="export"><span data-icon="export" aria-hidden="true"></span>Export</button>
   <button role="menuitem" type="button" id="btn-mixer"><span data-icon="mixer" aria-hidden="true"></span>Mixer</button>

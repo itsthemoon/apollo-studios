@@ -1,7 +1,7 @@
 // js/icons.js — the Studio glyph set as one sprite, so every icon is a real
 // vector instead of a text character. Call hydrate() after any render.
 const NAMES = [
-  'menu', 'logo', 'plus', 'minus', 'undo', 'redo', 'metronome', 'play', 'rewind', 'record',
+  'menu', 'logo', 'plus', 'minus', 'folder', 'undo', 'redo', 'metronome', 'play', 'rewind', 'record',
   'loop', 'scissors', 'zoom-in', 'zoom-out', 'mic', 'chev-left', 'chev-right', 'dots', 'keys', 'drum', 'wave', 'plug',
   'guitar', 'bass', 'fx', 'pan', 'bell', 'chat', 'user', 'chevron', 'close', 'edit',
   'bypass', 'heart', 'sparkle', 'speaker', 'sliders', 'list', 'grid', 'globe',
@@ -76,6 +76,7 @@ const PATHS = {
   'chev-left': '<path d="M12 4l-6 8 6 8"/>',
   'chev-right': '<path d="M8 4l6 8-6 8"/>',
   dots: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   minus: '<path d="M5 12h14"/>',
   autopitch: '<path d="M6 15.5V5.5l7-1.4v9.4"/><circle cx="4.3" cy="15.8" r="1.8"/><path d="M14.5 5.4l.9 2 2 .9-2 .9-.9 2-.9-2-2-.9 2-.9z"/>',
   duet: '<circle cx="6" cy="7" r="2.4"/><circle cx="13.4" cy="7" r="2.4"/><path d="M1.9 16.2c0-2.4 1.8-4 4.1-4s4.1 1.6 4.1 4M9.3 16.2c0-2.4 1.8-4 4.1-4s4.1 1.6 4.1 4"/>',
