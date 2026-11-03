@@ -20,7 +20,7 @@
 .panin { width: 76px; accent-color: var(--dim); }
 .th-vol { flex: 1; height: 3px; accent-color: var(--cyan); }
 .th-vol-read { font-family: var(--mono); font-size: 10px; color: var(--dim); min-width: 44px; }
-.th-meter { width: 40px; height: 3px; background: #24242a; border-radius: 2px; overflow: hidden; }
+.th-meter { width: 40px; height: 5px; background: #24242a; border-radius: 2px; box-shadow: inset 0 0 0 1px #3a3a44; overflow: hidden; }
 .th-meter i { display: block; height: 100%; width: 0; background: #63c07f; }
 .automation-lane { position: relative; padding: 4px 8px 6px; background: #0f1416; border-top: 1px solid #1c2427; }
 .auto-canvas { width: 100%; height: 46px; display: block; background: #0b1113; border-radius: 4px; }
@@ -551,7 +551,7 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 
 /* ---- transport key pill --------------------------------------------------- */
 .keypill { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 6px; border-radius: 6px; background: #17171c; border: 1px solid #2c2c35; font-size: 11px; }
-.keypill select { appearance: none; background: none; border: 0; color: #e6e6ee; font-size: 11px; padding: 0 1px; }
+.keypill select { appearance: none; background-color: transparent; background-image: none; border: 0; color: #e6e6ee; font-size: 11px; padding: 0 10px 0 1px; }
 .keypill select + select { color: #9a9aa8; }
 
 /* the dock must leave room for its own tab bar */
@@ -561,14 +561,15 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .strip .knobs, .strip .knob-row { flex: 0 0 auto; }
 
 /* every select wears the same skin, including the transport and inspector ones */
-.ins-field select, .ap-adv select, .fxp-head select, .gridsel select, .ap-alg select, #in-root, #in-mode {
+.ins-field select, .ap-adv select, .fxp-head select, .gridsel select, .ap-alg select, select.ts, #in-root, #in-mode {
   appearance: none; -webkit-appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, #8b8b99 50%), linear-gradient(135deg, #8b8b99 50%, transparent 50%);
-  background-position: calc(100% - 11px) 10px, calc(100% - 7px) 10px;
-  background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%238b8b99' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-position: calc(100% - 6px) center; background-size: 10px 6px; background-repeat: no-repeat;
 }
-.ts { height: 24px; padding: 0 7px; border-radius: 6px; background: #17171c; border: 1px solid #2c2c35; font-size: 11px; line-height: 22px; display: inline-flex; align-items: center; }
-.keypill select { padding-right: 12px; background-position: calc(100% - 6px) 9px, calc(100% - 2px) 9px; }
+/* the meter picker the shell builds into .tb-left */
+select.ts { height: 24px; padding: 0 18px 0 7px; border-radius: 6px; background-color: #17171c; border: 1px solid #2c2c35; font-size: 11px; }
+span.ts { height: 24px; padding: 0 7px; border-radius: 6px; background: #17171c; border: 1px solid #2c2c35; font-size: 11px; line-height: 22px; display: inline-flex; align-items: center; }
+
 .gridsel select { height: 22px; padding: 0 16px 0 6px; border-radius: 5px; background-color: #17171c; border: 1px solid #2c2c35; font-size: 10.5px; }
 /* 3. sliders take the accent everywhere, not the platform blue */
 input[type="range"] { accent-color: var(--accent, #00c6d1); }
@@ -576,3 +577,10 @@ input[type="range"] { accent-color: var(--accent, #00c6d1); }
 .ap-tile[aria-pressed="true"] .ic, .ap-tile.on .ic, .fxtile.on .ic, .fxtile[aria-pressed="true"] .ic { color: #14141a; }
 
 .ap-alg select { height: 24px; padding: 0 18px 0 8px; border-radius: 6px; background-color: #17171c; border: 1px solid #2c2c35; font-size: 11px; }
+
+.ins-right .knobs { gap: 10px; }
+.ins-right .pan-knob { width: 24px; height: 24px; }
+.ins-right .knob i { color: #a6a6b4; }
+
+/* the key pill reads as one label, so neither half carries a caret */
+#in-root, #in-mode { background-image: none; padding-right: 8px; }

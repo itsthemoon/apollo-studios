@@ -190,7 +190,7 @@ ul { padding-left: 18px; }
 .colour[data-colour="6"] { background: var(--red); }
 .th-vol { flex: 1; height: 3px; accent-color: var(--cyan); min-width: 0; }
 .th-vol-read { font-family: var(--mono); font-size: 9.5px; color: var(--dim); }
-.th-meter { width: 34px; height: 3px; border-radius: 2px; background: rgba(194, 215, 242, 0.12); overflow: hidden; }
+.th-meter { width: 34px; height: 4px; border-radius: 2px; background: rgba(194, 215, 242, 0.22); box-shadow: inset 0 0 0 1px rgba(194, 215, 242, 0.28); overflow: hidden; }
 .th-meter i { display: block; width: 0; height: 100%; background: var(--cyan); }
 
 .panwrap { position: relative; width: 22px; height: 22px; display: block; }
