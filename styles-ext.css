@@ -505,3 +505,29 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .ap-adv output { font-size: 11px; color: #9a9aa8; }
 .ap-banner { margin: 8px 0 0; font-size: 11px; color: #8b8b98; }
 .ap-extra { margin-top: 8px; }
+
+/* ---- Effects panel: measured against the shipping product ----------------- */
+.panel.fxp { padding: 10px 12px 12px; }
+.fxp-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+.fxp-track { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #cfcfda; }
+.fxp-track b { font-weight: 600; }
+.fxp-body { display: grid; grid-template-columns: 210px 1fr; gap: 14px; align-items: start; }
+.fxp-presets { display: grid; gap: 7px; }
+.fxp-thumb { width: 46px; height: 46px; border-radius: 7px; background: #f2f2f6; }
+.fxp-preset-row { display: flex; align-items: center; gap: 6px; }
+.blend { display: flex; align-items: center; gap: 5px; font-size: 11px; color: #8b8b98; }
+.blend input { flex: 1 1 auto; min-width: 0; }
+.blend .crown { color: #f0b34a; font-size: 9px; }
+.blend .info { width: 13px; height: 13px; border-radius: 50%; border: 1px solid #4a4a58; font-size: 8px; display: grid; place-items: center; }
+.fxchain { display: flex; gap: 8px; align-items: stretch; min-height: 132px; flex-wrap: wrap; }
+.blend output { white-space: nowrap; }
+.fxtile { width: 118px; min-height: 132px; border-radius: 10px; border: 1px dashed #34343f; background: #15151a; color: #a8a8b6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 11px; cursor: pointer; position: relative; padding: 10px; text-align: center; }
+.fxtile:hover { border-color: #4a4a58; color: #e6e6ee; }
+.fxtile .spark { font-size: 20px; color: var(--accent, #00c6d1); }
+.fxtile .plus { font-size: 22px; line-height: 1; }
+.fxtile em.ai { position: absolute; top: 6px; right: 6px; }
+.fxrow { min-width: 150px; min-height: 132px; border-radius: 10px; border: 1px solid #2c2c35; background: #17171c; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+.fxrow.off { opacity: .5; }
+.fxlist button { display: grid; gap: 2px; position: relative; }
+.fxlist .crown { position: absolute; top: 8px; right: 8px; color: #f0b34a; }
+.fxp-more:not([hidden]) { display: grid; gap: 6px; }

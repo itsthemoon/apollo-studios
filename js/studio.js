@@ -914,13 +914,29 @@ export function attach(app) {
   }
 
   // ---------------------------------------------------------------- effect chains
-  const fxCat = { value: 'all', query: '' }
+  const fxCat = { value: 'recommended', query: '' }
+  const FX_BLURB = {
+    reverb: 'Room, hall and cathedral spaces.',
+    chorus: 'Widening modulation for doubles.',
+    eq3: 'Low, mid and high shelves.',
+    comp: 'Level control with a makeup stage.',
+    limiter: 'Ceiling that never lets a peak through.',
+    gain: 'One knob of level.',
+    widener: 'Push the sides apart or fold to mono.',
+    tremolo: 'Amplitude movement.',
+    gate: 'Silence below the threshold.',
+    dist: 'Drive, tone and mix.',
+    delay: 'Echo with feedback and ping-pong.',
+    phaser: 'Sweeping notches.',
+    bitcrush: 'Bit and rate reduction.',
+    filter: 'Resonant low and high pass.',
+  }
   function renderFxBrowser() {
-    $('fx-cats').innerHTML = [{ id: 'all', label: 'All' }, ...fx.FX_CATEGORIES]
+    $('fx-cats').innerHTML = fx.FX_CATEGORIES
       .map(c => `<button type="button" data-cat="${c.id}" class="${c.id === fxCat.value ? 'on' : ''}">${c.label}</button>`).join('')
     $('fx-list').innerHTML = fx.FX_LIST
-      .filter(e => (fxCat.value === 'all' || e.category === fxCat.value) && (!fxCat.query || e.name.toLowerCase().includes(fxCat.query)))
-      .map(e => `<button type="button" role="listitem" data-add="${e.slug}"><b>${e.name}</b><i>${e.category} · ${e.params.length} param${e.params.length === 1 ? '' : 's'}</i></button>`).join('')
+      .filter(e => e.cats.includes(fxCat.value) && (!fxCat.query || e.name.toLowerCase().includes(fxCat.query)))
+      .map(e => `<button type="button" role="listitem" data-add="${e.slug}">${fx.EFFECT_TIER?.[e.slug] === 'membership' ? '<em class="crown" aria-hidden="true">&#128081;</em>' : ''}<b>${e.name}</b><i>${FX_BLURB[e.slug] || ''}</i></button>`).join('')
   }
   $('fx-cats').addEventListener('click', (e) => {
     const b = e.target.closest('[data-cat]')
@@ -939,11 +955,7 @@ export function attach(app) {
     syncTrackDom(t)
     closeModal($('m-fx'))
   })
-  $('btn-fx-add').addEventListener('click', () => {
-    // the add button lives inside the active track's chain, so it targets that track
-    if (!findTrack(state.fxTarget)) state.fxTarget = state.active
-    openModal('fx')
-  })
+
   $('btn-fx-preset-none').addEventListener('click', () => {
     const t = findTrack(state.active)
     if (!t) return
@@ -959,7 +971,7 @@ export function attach(app) {
     app.log('fx preset saved')
   })
   $('in-fx-blend').addEventListener('input', (e) => { $('out-fx-blend').textContent = `${e.target.value} %` })
-  $('btn-fx-prompt').addEventListener('click', () => {
+  function promptEffect() {
     const t = findTrack(state.active)
     if (!t) return
     const words = (window.prompt('Describe the sound you want', 'wider, brighter vocal') || '').toLowerCase()
@@ -971,16 +983,32 @@ export function attach(app) {
       syncTrackDom(t)
       app.log(`fx prompt: ${words} → ${guess} ${effect.id}`)
     } catch (err) { app.log(`fx prompt: ${err.message}`) }
-  })
-  $('btn-fx-add').setAttribute('aria-label', 'Add an effect to the active track')
+  }
+  function openFxBrowser() {
+    if (!findTrack(state.fxTarget)) state.fxTarget = state.active
+    renderFxBrowser()
+    openModal('fx')
+  }
+  $('btn-fx-add').addEventListener('click', openFxBrowser)
 
   function renderChain(t) {
     const host = $('fx-chain')
     host.innerHTML = ''
     const used = t.chain.effects.length
     const cap = t.chain.capacity ?? 8
-    $('fx-capacity').textContent = used >= cap ? 'Maximum amount of effects reached' : `${used} / ${cap}`
+    $('fx-capacity').textContent = used >= cap ? 'Maximum amount of effects reached' : ''
     $('btn-fx-add').disabled = used >= cap
+    $('fxp-name').textContent = t.name
+    const shown = t.chain.effects.filter(e => e.slug !== fx.LIMITER_SLUG)
+    if (!shown.length) {
+      // empty chains offer the two ways in, as tiles
+      host.innerHTML = `
+        <button class="fxtile ai" type="button" id="btn-fx-prompt"><span class="spark" aria-hidden="true">&#10022;</span><em class="ai">AI</em>Generate With Prompt</button>
+        <button class="fxtile add" type="button" id="btn-fx-add-tile" aria-label="Add an effect to the active track"><span class="plus" aria-hidden="true">+</span>Add Effect</button>`
+      $('btn-fx-add-tile').addEventListener('click', openFxBrowser)
+      $('btn-fx-prompt').addEventListener('click', promptEffect)
+      return
+    }
     t.chain.effects.forEach((effect) => {
       const row = document.createElement('div')
       row.className = `fxrow${effect.bypass ? ' off' : ''}`
@@ -991,19 +1019,6 @@ export function attach(app) {
         <button class="ic mini" type="button" aria-label="Bypass ${spec.name}" data-bypass="${effect.id}"><span data-icon="bypass" aria-hidden="true"></span></button>`
       host.append(row)
     })
-    if (!t.chain.effects.some(e => e.slug !== fx.LIMITER_SLUG)) {
-      const empty = document.createElement('p')
-      empty.className = 'hint'
-      empty.textContent = 'the safety limiter is all that is loaded — + Add effect builds the chain'
-      host.append(empty)
-    }
-    const limiter = t.chain.effects.find(e => e.slug === fx.LIMITER_SLUG)
-    if (!limiter) {
-      const row = document.createElement('div')
-      row.className = 'fxrow'
-      row.innerHTML = '<b>Limiter</b><span class="lit">always last</span><span></span><span></span>'
-      host.append(row)
-    }
     const fc = document.querySelector(`[data-fx-count="${t.id}"]`)
     if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
     const slot = document.querySelector(`.strip [data-insert="${t.id}"]`)
@@ -1014,6 +1029,20 @@ export function attach(app) {
     }
   }
 
+  $('btn-fx-close').addEventListener('click', () => openPanel('take'))
+  $('btn-fx-preset-menu').addEventListener('click', () => {
+    const more = $('fxp-more')
+    more.hidden = !more.hidden
+  })
+  $('btn-fx-bypass').addEventListener('click', () => {
+    const t = findTrack(state.active)
+    if (!t) return
+    const on = $('btn-fx-bypass').getAttribute('aria-pressed') !== 'true'
+    $('btn-fx-bypass').setAttribute('aria-pressed', String(on))
+    t.chain.effects.forEach(e => { if (e.slug !== fx.LIMITER_SLUG) e.bypass = on })
+    renderChain(t)
+    app.log(`fx ${on ? 'bypassed' : 'active'}`)
+  })
   $('fx-chain').addEventListener('click', (e) => {
     const t = state.tracks.find(x => x.chain.effects.length && $('fx-chain').contains(e.target))
     const active = state.tracks.find(x => x.id === state.active) || t

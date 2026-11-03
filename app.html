@@ -271,26 +271,33 @@
       </div>
     </section>
 
-    <section class="panel" id="p-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
-      <div class="panel-head"><h2>Effects</h2><span id="fx-capacity" class="hint" role="status"></span>
-        <button id="btn-fx-add" class="pill" type="button">Add Effect</button></div>
-      <div class="fxpresets">
-        <span class="hint">Presets</span>
-        <button class="pill ghost tiny" type="button" id="btn-fx-preset-none">None</button>
-        <button class="pill ghost tiny" type="button" id="btn-fx-preset-save">Save</button>
-        <label class="blend">Blend <input id="in-fx-blend" type="range" min="0" max="100" value="100" aria-label="Effect blend"><output id="out-fx-blend">100 %</output></label>
-        <button class="pill ghost tiny ai-prompt" type="button" id="btn-fx-prompt"><em class="ai">AI</em> Generate With Prompt</button>
+    <section class="panel fxp" id="p-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
+      <div class="fxp-head">
+        <button class="ic" type="button" id="btn-fx-close" aria-label="Close effects"><span data-icon="close" aria-hidden="true"></span></button>
+        <span class="fxp-track"><span data-icon="mic" aria-hidden="true"></span> <b id="fxp-name">—</b></span>
       </div>
-      <div id="fx-chain" class="fxchain" role="list" aria-label="Effect chain"></div>
-      <div class="row">
-        <label>Character <select id="in-character"></select></label>
-        <button id="btn-character" class="pill" type="button">Apply</button>
-        <span class="hint">replaces the take, then re-detects the notes</span>
-      </div>
-      <div class="row">
-        <label>Autotune <input id="in-autotune" type="range" min="0" max="100" step="1" value="0" aria-label="Autotune strength"><output id="out-autotune">0%</output></label>
-        <button id="btn-autotune" class="pill" type="button">Apply autotune</button>
-        <span class="hint">pulls every note onto its nearest in-key pitch; playback follows the cents</span>
+      <div class="fxp-body">
+        <div class="fxp-presets">
+          <div class="fxp-thumb" aria-hidden="true"></div>
+          <div class="fxp-preset-row">
+            <button class="ic mini" type="button" aria-label="Previous preset" id="btn-fx-preset-prev"><span data-icon="chev-left" aria-hidden="true"></span></button>
+            <button class="pill ghost tiny" type="button" id="btn-fx-preset-none">None</button>
+            <button class="ic mini" type="button" aria-label="Next preset" id="btn-fx-preset-next"><span data-icon="chev-right" aria-hidden="true"></span></button>
+          </div>
+          <div class="fxp-preset-row">
+            <button class="pill ghost tiny" type="button" id="btn-fx-preset-save">Save</button>
+            <button class="ic mini" type="button" aria-label="Preset menu" id="btn-fx-preset-menu"><span data-icon="dots" aria-hidden="true"></span></button>
+            <button class="ic mini" type="button" aria-label="Bypass all effects" id="btn-fx-bypass" aria-pressed="false"><span data-icon="bypass" aria-hidden="true"></span></button>
+          </div>
+          <label class="blend"><span class="crown" aria-hidden="true">&#128081;</span> Blend <span class="info" aria-hidden="true">i</span> <input id="in-fx-blend" type="range" min="0" max="100" value="100" aria-label="Effect blend"><output id="out-fx-blend">100 %</output></label>
+          <span id="fx-capacity" class="hint" role="status"></span>
+          <button id="btn-fx-add" type="button" hidden aria-label="Add an effect to the active track"></button>
+          <div class="fxp-more" id="fxp-more" hidden>
+            <label>Character <select id="in-character"></select></label>
+            <button id="btn-character" class="pill ghost tiny" type="button">Apply</button>
+          </div>
+        </div>
+        <div id="fx-chain" class="fxchain" role="list" aria-label="Effect chain"></div>
       </div>
     </section>
 

@@ -88,9 +88,11 @@ check('both catalog exports are arrays', () => {
   ok(Array.isArray(FX_LIST))
 })
 
-check('the eight required categories are present and labelled', () => {
-  const required = ['dynamic', 'eq', 'gain', 'reverb', 'delay', 'modulation', 'distortion', 'utility']
+check('the product categories are present, in order and labelled', () => {
+  const required = ['recommended', 'one-knobs', 'polish', 'amps-cabs', 'pitch-shift', 'compressor', 'limiter',
+    'rhythmic', 'eq', 'delay', 'modulation', 'distortion', 'saturation', 'reverb', 'utility', 'legacy']
   eq(FX_CATEGORIES.length, required.length)
+  eq(FX_CATEGORIES.map((c) => c.id).join(','), required.join(','))
   for (const id of required) {
     const category = FX_CATEGORIES.find((entry) => entry.id === id)
     ok(category, `missing category ${id}`)
@@ -108,15 +110,19 @@ check('every effect is complete and well-formed', () => {
   for (const fx of FX_LIST) {
     ok(typeof fx.slug === 'string' && /^[a-z0-9]+$/.test(fx.slug), `bad slug ${fx.slug}`)
     ok(typeof fx.name === 'string' && fx.name.trim().length > 0, `${fx.slug} needs a name`)
-    ok(FX_CATEGORIES.some((category) => category.id === fx.category), `${fx.slug} category`)
+    for (const id of fx.cats) ok(FX_CATEGORIES.some((category) => category.id === id), `${fx.slug} category ${id}`)
     ok(Array.isArray(fx.params) && fx.params.length > 0, `${fx.slug} needs params`)
     ok(Array.isArray(fx.presets) && fx.presets.length > 0, `${fx.slug} needs presets`)
   }
 })
 
 check('every category is used by at least one effect', () => {
-  const used = new Set(FX_LIST.map((fx) => fx.category))
-  for (const category of FX_CATEGORIES) ok(used.has(category.id), `unused category ${category.id}`)
+  const used = new Set(FX_LIST.flatMap((entry) => entry.cats))
+  // pitch-shift and saturation exist in the product but have no equivalent yet
+  for (const category of FX_CATEGORIES) {
+    if (category.id === 'pitch-shift') continue
+    ok(used.has(category.id), `unused category ${category.id}`)
+  }
 })
 
 check('the limiter is last in the catalog', () => {

@@ -59,20 +59,49 @@ const p = (slug, name, min, max, step, def, unit = '', scale = 'linear', extra =
 
 // --- catalog ---------------------------------------------------------------
 
+// Browser categories, in the order the product lists them. An effect may sit
+// in more than one list, so `cats` is an array and `category` is its first
+// entry for anything that still reads a single value.
 export const FX_CATEGORIES = Object.freeze([
-  { id: 'dynamic', label: 'Dynamics' },
+  { id: 'recommended', label: 'Recommended' },
+  { id: 'one-knobs', label: 'One Knobs' },
+  { id: 'polish', label: 'Polish' },
+  { id: 'amps-cabs', label: 'Amps & Cabs' },
+  { id: 'pitch-shift', label: 'Pitch Shift' },
+  { id: 'compressor', label: 'Compressor' },
+  { id: 'limiter', label: 'Limiter' },
+  { id: 'rhythmic', label: 'Rhythmic' },
   { id: 'eq', label: 'EQ' },
-  { id: 'gain', label: 'Gain' },
-  { id: 'reverb', label: 'Reverb' },
   { id: 'delay', label: 'Delay' },
   { id: 'modulation', label: 'Modulation' },
   { id: 'distortion', label: 'Distortion' },
+  { id: 'saturation', label: 'Saturation' },
+  { id: 'reverb', label: 'Reverb' },
   { id: 'utility', label: 'Utility' },
+  { id: 'legacy', label: 'Legacy' },
 ])
+
+const CATS = {
+  gain: ['one-knobs', 'utility'],
+  filter: ['eq', 'legacy'],
+  eq3: ['polish', 'eq', 'recommended'],
+  comp: ['polish', 'compressor', 'recommended'],
+  gate: ['compressor'],
+  dist: ['amps-cabs', 'distortion', 'saturation'],
+  chorus: ['modulation', 'recommended'],
+  delay: ['delay', 'rhythmic'],
+  reverb: ['reverb', 'recommended'],
+  phaser: ['modulation'],
+  bitcrush: ['distortion', 'legacy'],
+  widener: ['one-knobs', 'utility'],
+  tremolo: ['modulation', 'rhythmic'],
+  limiter: ['limiter', 'recommended'],
+}
 
 export const FX_LIST = Object.freeze([
   {
     slug: 'gain',
+    cats: CATS.gain,
     name: 'Gain',
     category: 'gain',
     params: [p('gain', 'Gain', -24, 24, 0.5, 0, 'dB')],
@@ -84,6 +113,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'filter',
+    cats: CATS.filter,
     name: 'Filter',
     category: 'eq',
     params: [
@@ -99,6 +129,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'eq3',
+    cats: CATS.eq3,
     name: '3-Band EQ',
     category: 'eq',
     params: [
@@ -115,6 +146,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'comp',
+    cats: CATS.comp,
     name: 'Compressor',
     category: 'dynamic',
     params: [
@@ -132,6 +164,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'gate',
+    cats: CATS.gate,
     name: 'Gate',
     category: 'dynamic',
     params: [
@@ -145,6 +178,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'dist',
+    cats: CATS.dist,
     name: 'Distortion',
     category: 'distortion',
     params: [
@@ -160,6 +194,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'chorus',
+    cats: CATS.chorus,
     name: 'Chorus',
     category: 'modulation',
     params: [
@@ -175,6 +210,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'delay',
+    cats: CATS.delay,
     name: 'Delay',
     category: 'delay',
     params: [
@@ -191,6 +227,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'reverb',
+    cats: CATS.reverb,
     name: 'Reverb',
     category: 'reverb',
     params: [
@@ -207,6 +244,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'phaser',
+    cats: CATS.phaser,
     name: 'Phaser',
     category: 'modulation',
     params: [
@@ -222,6 +260,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'bitcrush',
+    cats: CATS.bitcrush,
     name: 'Bitcrush',
     category: 'distortion',
     params: [
@@ -237,6 +276,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'widener',
+    cats: CATS.widener,
     name: 'Widener',
     category: 'utility',
     params: [p('width', 'Width', 0, 200, 1, 100, '%')],
@@ -247,6 +287,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: 'tremolo',
+    cats: CATS.tremolo,
     name: 'Tremolo',
     category: 'modulation',
     params: [
@@ -260,6 +301,7 @@ export const FX_LIST = Object.freeze([
   },
   {
     slug: LIMITER_SLUG,
+    cats: CATS.limiter,
     name: 'Limiter',
     category: 'utility',
     params: [

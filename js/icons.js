@@ -2,7 +2,7 @@
 // vector instead of a text character. Call hydrate() after any render.
 const NAMES = [
   'menu', 'logo', 'plus', 'undo', 'redo', 'metronome', 'play', 'rewind', 'record',
-  'loop', 'scissors', 'zoom-in', 'zoom-out', 'mic', 'keys', 'drum', 'wave', 'plug',
+  'loop', 'scissors', 'zoom-in', 'zoom-out', 'mic', 'chev-left', 'chev-right', 'dots', 'keys', 'drum', 'wave', 'plug',
   'guitar', 'bass', 'fx', 'pan', 'bell', 'chat', 'user', 'chevron', 'close', 'edit',
   'bypass', 'heart', 'sparkle', 'speaker', 'sliders', 'list', 'grid', 'globe',
   'crown', 'save', 'chevron-down', 'music', 'headphones', 'automation', 'dot-circle',
@@ -73,6 +73,9 @@ const PATHS = {
   sounds: '<path d="M4 11.5v-3M7 14V6M10 12.5v-5M13 16V4M16 10.5v-1"/>',
   shortcuts: '<rect x="2.5" y="5.5" width="15" height="9" rx="2"/><path d="M5.5 9h1.2M8.5 9h1.2M11.5 9h1.2M14.5 9h.5M6 12.2h8"/>',
   invite: '<circle cx="7.8" cy="7.5" r="2.8"/><path d="M2.5 16.5c0-2.7 2.4-4.2 5.3-4.2"/><path d="M15 9.5v5M12.5 12h5"/>',
+  'chev-left': '<path d="M12 4l-6 8 6 8"/>',
+  'chev-right': '<path d="M8 4l6 8-6 8"/>',
+  dots: '<circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/>',
   autopitch: '<path d="M6 15.5V5.5l7-1.4v9.4"/><circle cx="4.3" cy="15.8" r="1.8"/><path d="M14.5 5.4l.9 2 2 .9-2 .9-.9 2-.9-2-2-.9 2-.9z"/>',
   duet: '<circle cx="6" cy="7" r="2.4"/><circle cx="13.4" cy="7" r="2.4"/><path d="M1.9 16.2c0-2.4 1.8-4 4.1-4s4.1 1.6 4.1 4M9.3 16.2c0-2.4 1.8-4 4.1-4s4.1 1.6 4.1 4"/>',
   mixer: '<path d="M5 3v5.5M5 12.5V17M10 3v3.5M10 10.5V17M15 3v8.5M15 15.5V17"/><circle cx="5" cy="10" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="15" cy="13" r="1.5"/>',

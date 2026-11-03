@@ -859,10 +859,8 @@ function autotune() {
   if (!state.notes.length) throw new Error('no notes to autotune')
   const root = Number($('in-root').value)
   const scale = $('in-scale').value
-  const strength = Number($('in-autotune').value)
+  const strength = Number($('in-snap').value)
   const amount = Math.min(1, Math.max(0, strength / 100))
-  $('in-snap').value = String(strength)
-  $('out-snap').textContent = `${strength}%`
   const before = state.notes.map(n => (Number.isFinite(n.origMidi) ? n.origMidi : n.midi))
   state.notes = tune.snapStrength(
     state.notes.map((n, i) => ({ ...n, midi: before[i] })),
@@ -1183,7 +1181,6 @@ function boot() {
   $('btn-demo').addEventListener('click', guard(loadDemo))
   $('btn-harmony').addEventListener('click', guard(buildHarmonies))
   $('btn-character').addEventListener('click', guard(applyCharacter))
-  $('btn-autotune').addEventListener('click', guard(autotune))
   $('btn-split').addEventListener('click', guard(split))
   $('btn-recombine').addEventListener('click', guard(recombineStems))
   $('btn-beat').addEventListener('click', guard(generateBeat))
@@ -1272,9 +1269,6 @@ function boot() {
   $('in-snap').addEventListener('input', () => {
     $('out-snap').textContent = `${$('in-snap').value}%`
     renderNotes()
-  })
-  $('in-autotune').addEventListener('input', () => {
-    $('out-autotune').textContent = `${$('in-autotune').value}%`
   })
   for (const [id, unit] of [['thresh', 'dB'], ['ratio', ':1'], ['ceiling', ' dB'], ['target', ' dB'], ['gain', ' dB']]) {
     $('in-' + id).addEventListener('input', () => { $('out-' + id).textContent = `${$('in-' + id).value}${unit}` })
