@@ -379,7 +379,11 @@ export function attach(app) {
     const n = document.querySelector(`[data-track="${t.id}"] .tname`)
     if (n && n.textContent !== t.name) n.textContent = t.name
     const fc = document.querySelector(`[data-fx-count="${t.id}"]`)
-    if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
+    if (fc) {
+      fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
+      const fb = document.querySelector(`[data-fx="${t.id}"]`)
+      if (fb) fb.title = fc.textContent
+    }
     const slot = document.querySelector(`.strip [data-insert="${t.id}"]`)
     if (slot) {
       const n2 = t.chain.effects.length
@@ -1020,7 +1024,11 @@ export function attach(app) {
       host.append(row)
     })
     const fc = document.querySelector(`[data-fx-count="${t.id}"]`)
-    if (fc) fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
+    if (fc) {
+      fc.textContent = t.chain.effects.length ? `${t.chain.effects.length} effect${t.chain.effects.length === 1 ? '' : 's'}` : 'no effects'
+      const fb = document.querySelector(`[data-fx="${t.id}"]`)
+      if (fb) fb.title = fc.textContent
+    }
     const slot = document.querySelector(`.strip [data-insert="${t.id}"]`)
     if (slot) {
       const n2 = t.chain.effects.length
@@ -1298,6 +1306,25 @@ export function attach(app) {
     paintAp()
     app.liveRefresh()
     app.log(`autopitch ${state.apState.enabled ? 'on' : 'off'}`)
+  })
+  $('btn-autodetect').addEventListener('click', () => {
+    if (!state.notes.length) { app.log('autodetect: load a take first'); return }
+    const midis = state.notes.map(n => n.midi)
+    let found = autopitch.detectKey(midis)
+    // material that visits every degree scores best as chromatic, which tunes
+    // nothing — so ask again for the best keyed scale and prefer that
+    if (found.scale === 'chromatic' && found.confidence >= 0.3) {
+      found = autopitch.detectKey(midis, ['major', 'minor'])
+    }
+    if (found.confidence < 0.25) { app.log('autodetect: too little material for a key'); return }
+    autopitch.setTonic(state.apState, found.tonic)
+    autopitch.setScale(state.apState, found.scale === 'pentatonic' ? 'pentatonic' : found.scale)
+    // the editor's key pill mirrors what was detected
+    $('in-root').value = String(found.tonic)
+    $('in-mode').value = found.scale === 'major' ? 'major' : 'minor'
+    paintAp()
+    app.liveRefresh()
+    app.log(`autodetect: ${KNOWN_NAMES[found.tonic]} ${found.scale} (${Math.round(found.confidence * 100)}% sure)`)
   })
   $('btn-ap-adv').addEventListener('click', () => {
     const adv = $('ap-adv')

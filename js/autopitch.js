@@ -247,7 +247,7 @@ function noteMidi(note) {
 // Pitch-class histogram from midi numbers (fractions allowed). Returns
 // { tonic, scale, confidence } — confidence is the winning coverage 0..1 and
 // is 0 for an empty list. Tonic notes weigh 1.5 so a key's own root wins ties.
-export function detectKey(midiNotes) {
+export function detectKey(midiNotes, scales = DETECT_ORDER) {
   if (!Array.isArray(midiNotes)) throw new Error('midiNotes must be an array')
   const weights = new Array(12).fill(0)
   let total = 0
@@ -261,7 +261,7 @@ export function detectKey(midiNotes) {
   }
   if (total === 0) return { tonic: 0, scale: 'chromatic', confidence: 0 }
   let best = { tonic: 0, scale: 'major', score: -Infinity }
-  for (const scale of DETECT_ORDER) {
+  for (const scale of scales) {
     const offsets = SCALES[scale]
     const penalty = 1 - COVERAGE_PENALTY * (offsets.length - 1)
     for (let tonic = 0; tonic < 12; tonic++) {

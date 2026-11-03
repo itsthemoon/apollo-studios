@@ -1256,6 +1256,7 @@ function boot() {
   $('btn-export').addEventListener('click', guard(exportWav))
   // #btn-save is owned by js/persist.js (local slot + Last Saved stamp)
   $('btn-demo').addEventListener('click', guard(loadDemo))
+  $('btn-menu-demo').addEventListener('click', guard(loadDemo))
   $('btn-harmony').addEventListener('click', guard(buildHarmonies))
   $('btn-character').addEventListener('click', guard(applyCharacter))
   $('btn-split').addEventListener('click', guard(split))
