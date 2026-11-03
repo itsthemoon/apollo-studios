@@ -54,6 +54,7 @@ def click(sel, SID=SID):
                        " if(!e) return JSON.stringify(null);"
                        " e.scrollIntoView({block:'center'});"
                        " var b=e.getBoundingClientRect();"
+                       " if(b.width===0&&b.height===0){e.click();return JSON.stringify({hidden:true,x:0,y:0})}"
                        " return JSON.stringify({x:b.left+b.width/2,y:b.top+b.height/2})"
                        "}catch(e){return JSON.stringify({err:String(e)})}})()",
             returnByValue=True)
@@ -266,7 +267,7 @@ emit(probe("return JSON.stringify({url:location.href,"
            " status:(document.getElementById('status')||{}).textContent||null,"
            " rec:!!document.getElementById('btn-record'),"
            " presets:document.querySelectorAll('#preset-list button').length,"
-           " scales:document.querySelectorAll('#in-scale option').length,"
+           " scales:document.querySelectorAll('#in-mode option').length,"
            " bootErr:window.__bootErr||null})"))
 `, d => d.rec && d.presets >= 1 && d.scales > 0 && d.status === 'ready' && !d.bootErr
       ? { pass: true, detail: `"${pageUrl}" loaded: record button, ${d.presets} presets, ${d.scales} scales, status "ready"` }
@@ -290,18 +291,20 @@ emit(probe("return JSON.stringify({rows:document.querySelectorAll('#note-list .n
       ? { pass: true, detail: `${d.rows} note rows rendered, header "${d.count}", ${d.mic}, canvas ${d.canvas}` }
       : { pass: false, detail: `rows=${d.rows} count=${show(d.count)} log=${show(d.log)} mic=${show(d.mic)}` })
 
+    const d0keys = (o) => (o && typeof o === 'object' ? Object.keys(o).join('|') : typeof o)
+
     step(3, 'scale and snap change cents, rows persist', `
 base = probe("return JSON.stringify({rows:document.querySelectorAll('#note-list .note').length,"
              " cents:Array.from(document.querySelectorAll('#note-list .note')).map(x=>x.children[2].textContent)})")
 emit(setval("#in-snap", "25", "input"))
-emit(setval("#in-scale", "major", "change"))
+emit(setval("#in-mode", "major", "change"))
 emit(setval("#in-snap", "25", "input"))
 time.sleep(0.25)
 a = probe("return JSON.stringify({rows:document.querySelectorAll('#note-list .note').length,"
           " cents:Array.from(document.querySelectorAll('#note-list .note')).map(x=>x.children[2].textContent),"
           " out:(document.getElementById('out-snap')||{}).textContent||'',"
-          " scale:document.getElementById('in-scale').value})")
-emit(setval("#in-scale", "chromatic", "change"))
+          " scale:document.getElementById('in-mode').value})")
+emit(setval("#in-mode", "minor", "change"))
 emit(setval("#in-snap", "100", "input"))
 emit(setval("#in-snap", "100", "input"))
 time.sleep(0.25)
@@ -310,14 +313,16 @@ b = probe("return JSON.stringify({rows:document.querySelectorAll('#note-list .no
           " out:(document.getElementById('out-snap')||{}).textContent||''})")
 emit({"base": base, "a": a, "b": b})
 `, d => {
-      const rowsHeld = d.a.rows === d.base.rows && d.b.rows === d.base.rows && d.base.rows > 0
-      const moved = JSON.stringify(d.a.cents) !== JSON.stringify(d.base.cents)
-      const movedBack = JSON.stringify(d.b.cents) !== JSON.stringify(d.a.cents)
-      const nonZero = d.a.cents.some(c => /^[+-]?[1-9]\d*c$/.test(c))
-      const wired = d.a.out === '25%' && d.b.out === '100%' && d.a.scale === 'major'
+      const base = d.base || {}, a = d.a || {}, b = d.b || {}
+      const cb = base.cents || [], ca = a.cents || [], cc = b.cents || []
+      const rowsHeld = a.rows === base.rows && b.rows === base.rows && base.rows > 0
+      const moved = JSON.stringify(ca) !== JSON.stringify(cb)
+      const movedBack = JSON.stringify(cc) !== JSON.stringify(ca)
+      const nonZero = ca.some(c => /^[+-]?[1-9]\d*c$/.test(c))
+      const wired = a.out === '25%' && b.out === '100%' && a.scale === 'major'
       return {
         pass: rowsHeld && moved && movedBack && nonZero && wired,
-        detail: `rows ${d.base.rows}->${d.a.rows}->${d.b.rows}, cents [${show(d.base.cents.join(','))}] -> [${show(d.a.cents.join(','))}] -> [${show(d.b.cents.join(','))}], snap ${show(d.a.out)}/${show(d.b.out)}`
+        detail: `rows ${base.rows}->${a.rows}->${b.rows}, cents [${show(cb.join(','))}] -> [${show(ca.join(','))}] -> [${show(cc.join(','))}], snap ${show(a.out)}/${show(b.out)}, keys ${show(d0keys(d))}`
       }
     })
 
@@ -325,6 +330,8 @@ emit({"base": base, "a": a, "b": b})
     const patches = Array.isArray(builtin) ? builtin : builtin.patches
 
     step(4, 'preset click updates preset state and band count', `
+emit(click("[data-menu=app]"))
+time.sleep(0.25)
 emit(click("[data-drawer=presets]"))
 time.sleep(0.25)
 before = probe("return JSON.stringify({bands:document.querySelectorAll('#eq-bands .band').length})")
@@ -335,7 +342,7 @@ after = probe("return JSON.stringify({"
               " bands:document.querySelectorAll('#eq-bands .band').length,"
               " on:document.querySelectorAll('#preset-list button.on').length,"
               " root:document.getElementById('in-root').value,"
-              " scale:document.getElementById('in-scale').value,"
+              " scale:document.getElementById('in-mode').value,"
               " snap:(document.getElementById('out-snap')||{}).textContent||'',"
               " log:(document.getElementById('log')||{}).textContent||''})")
 emit({"before": before, "after": after})
@@ -366,6 +373,8 @@ emit(probe("return JSON.stringify({peak:(document.getElementById('meter-peak')||
       : { pass: false, detail: `peak=${show(d.peak)} rms=${show(d.rms)} gain=${show(d.gain)}` })
 
     step(6, 'Export logs a byte count and marks the project exported', `
+emit(click("[data-menu=app]"))
+time.sleep(0.25)
 emit(click("#btn-export-tab"))
 time.sleep(0.3)
 emit(click("#btn-export"))

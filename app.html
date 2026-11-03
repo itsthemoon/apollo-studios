@@ -301,7 +301,7 @@
           <label class="blend"><span class="crown" aria-hidden="true">&#128081;</span> Blend <span class="info" aria-hidden="true">i</span> <input id="in-fx-blend" type="range" min="0" max="100" value="100" aria-label="Effect blend"><output id="out-fx-blend">100 %</output></label>
           <span id="fx-capacity" class="hint" role="status"></span>
           <button id="btn-fx-add" type="button" hidden aria-label="Add an effect to the active track"></button>
-          <div class="fxp-more" id="fxp-more" hidden>
+          <div class="fxp-more" id="fxp-more">
             <label>Character <select id="in-character"></select></label>
             <button id="btn-character" class="pill ghost tiny" type="button">Apply</button>
           </div>
@@ -525,8 +525,9 @@
 
 <div class="menu" id="menu-app" role="menu" hidden>
   <button role="menuitem" type="button" id="btn-open-wrap"><label class="file" role="button" tabindex="0"><span data-icon="folder" aria-hidden="true"></span>Open a project<input id="file-project" type="file" accept=".json,application/json" hidden aria-label="Open a project file"></label></button>
+  <button role="menuitem" type="button" data-drawer="presets"><span data-icon="sliders" aria-hidden="true"></span>Presets</button>
   <button role="menuitem" type="button" data-panel-open="p-master"><span data-icon="music" aria-hidden="true"></span>Mastering</button>
-  <button role="menuitem" type="button" data-drawer="export"><span data-icon="export" aria-hidden="true"></span>Export</button>
+  <button role="menuitem" type="button" data-drawer="export" id="btn-export-tab"><span data-icon="export" aria-hidden="true"></span>Export</button>
   <button role="menuitem" type="button" id="btn-mixer"><span data-icon="mixer" aria-hidden="true"></span>Mixer</button>
   <button role="menuitem" type="button" data-panel-open="p-versions"><span data-icon="history" aria-hidden="true"></span>Version history</button>
   <button role="menuitem" type="button" data-modal="settings"><span data-icon="settings" aria-hidden="true"></span>Settings</button>
