@@ -478,12 +478,12 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .ap-tile[aria-pressed='true'] { background: #f2f2f6; border-color: #f2f2f6; color: #101014; }
 .ap-tile .crown { position: absolute; top: 3px; right: 3px; font-size: 8px; color: #f0b34a; }
 .ap-knob { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 6px; }
-.knob { width: 135px; height: 135px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, #22222a 0 58%, #141419 59%); border: 1px solid #2c2c35; position: relative; cursor: grab; touch-action: none; }
-.knob:active { cursor: grabbing; }
-.knob .ticks { position: absolute; inset: 0; width: 100%; height: 100%; }
-.knob .ticks line { stroke: #4c4c5a; stroke-width: 2; }
-.knob .ticks line.on { stroke: var(--accent, #00c6d1); }
-.knob .needle { position: absolute; left: 50%; top: 10px; width: 2px; height: 38px; margin-left: -1px; background: var(--accent, #00c6d1); border-radius: 2px; transform-origin: 50% 57px; }
+#knob-ap { width: 135px; height: 135px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, #22222a 0 58%, #141419 59%); border: 1px solid #2c2c35; position: relative; cursor: grab; touch-action: none; }
+#knob-ap:active { cursor: grabbing; }
+#knob-ap .ticks { position: absolute; inset: 0; width: 100%; height: 100%; }
+#knob-ap .ticks line { stroke: #4c4c5a; stroke-width: 2; }
+#knob-ap .ticks line.on { stroke: var(--accent, #00c6d1); }
+#knob-ap .needle { position: absolute; left: 50%; top: 10px; width: 2px; height: 38px; margin-left: -1px; background: var(--accent, #00c6d1); border-radius: 2px; transform-origin: 50% 57px; }
 .knob-label { font-size: 11px; color: #9a9aa8; }
 .piano { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: 26px 30px; gap: 4px; position: relative; }
 .piano button { border-radius: 5px; border: 1px solid #2c2c35; background: #17171c; color: #9a9aa8; font-size: 9px; line-height: 1.05; cursor: pointer; padding: 0 1px; }
@@ -559,3 +559,20 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .dock { min-height: 0; }
 #p-harmony, #p-voice, #p-take { max-height: calc(100vh - 320px); overflow: auto; }
 .strip .knobs, .strip .knob-row { flex: 0 0 auto; }
+
+/* every select wears the same skin, including the transport and inspector ones */
+.ins-field select, .ap-adv select, .fxp-head select, .gridsel select, .ap-alg select, #in-root, #in-mode {
+  appearance: none; -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #8b8b99 50%), linear-gradient(135deg, #8b8b99 50%, transparent 50%);
+  background-position: calc(100% - 11px) 10px, calc(100% - 7px) 10px;
+  background-size: 4px 4px, 4px 4px; background-repeat: no-repeat;
+}
+.ts { height: 24px; padding: 0 7px; border-radius: 6px; background: #17171c; border: 1px solid #2c2c35; font-size: 11px; line-height: 22px; display: inline-flex; align-items: center; }
+.keypill select { padding-right: 12px; background-position: calc(100% - 6px) 9px, calc(100% - 2px) 9px; }
+.gridsel select { height: 22px; padding: 0 16px 0 6px; border-radius: 5px; background-color: #17171c; border: 1px solid #2c2c35; font-size: 10.5px; }
+/* 3. sliders take the accent everywhere, not the platform blue */
+input[type="range"] { accent-color: var(--accent, #00c6d1); }
+/* 4. a selected tile needs a dark glyph on its light face */
+.ap-tile[aria-pressed="true"] .ic, .ap-tile.on .ic, .fxtile.on .ic, .fxtile[aria-pressed="true"] .ic { color: #14141a; }
+
+.ap-alg select { height: 24px; padding: 0 18px 0 8px; border-radius: 6px; background-color: #17171c; border: 1px solid #2c2c35; font-size: 11px; }
