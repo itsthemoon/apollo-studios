@@ -36,12 +36,13 @@ const state = {
   rec: null,
   playing: [],
   live: [],
+  region: { pitch: 0, rate: 1, gainDb: 0, reverse: false },
+  peakCache: null,
   ctx: null,
   harmonies: [],
   stems: null,
   demoDuration: null,
   playhead: 0,
-  live: null,
   wavePeaks: new Map(),
   takeSpans: new Map(),
 }
@@ -144,6 +145,7 @@ function renderBands() {
 }
 
 function renderNotes() {
+  queueMicrotask(paintRegion) // wave + readouts follow the model
   state.studio?.drawRoll?.()
   const host = $('note-list')
   host.innerHTML = ''
@@ -734,6 +736,56 @@ function liveRefresh() {
   })
 }
 
+// The take as the region settings say to play it: reversed copy when flipped.
+function regionWave() {
+  if (!state.region.reverse) return state.take
+  const out = Float32Array.from(state.take)
+  out.reverse()
+  return out
+}
+
+function paintRegion() {
+  const r = state.region
+  $('reg-name').textContent = state.notes.length ? 'Skin' : 'no take'
+  $('out-reg-pitch').textContent = `${r.pitch > 0 ? '+' : ''}${r.pitch}`
+  $('out-reg-rate').textContent = r.rate.toFixed(2)
+  $('in-reg-gain').value = String(r.gainDb)
+  $('out-reg-gain').textContent = `${r.gainDb > 0 ? '+' : ''}${r.gainDb.toFixed(1)} dB`
+  $('btn-reg-reverse').setAttribute('aria-pressed', String(r.reverse))
+  paintRegionWave()
+}
+
+function paintRegionWave() {
+  const canvas = $('reg-wave')
+  if (!canvas) return
+  const w = canvas.clientWidth || 900
+  const h = canvas.clientHeight || 150
+  canvas.width = w
+  canvas.height = h
+  const ctx2d = canvas.getContext('2d')
+  ctx2d.clearRect(0, 0, w, h)
+  if (!state.take?.length) return
+  if (!state.peakCache) state.peakCache = waves.buildCache(state.take, state.sampleRate)
+  const cols = waves.columns(state.peakCache, 0, state.take.length, w)
+  ctx2d.fillStyle = 'rgba(0,198,209,0.85)'
+  const mid = h / 2
+  for (let x = 0; x < cols.peak.length; x++) {
+    const amp = Math.max(1, cols.peak[x] * mid)
+    ctx2d.fillRect(x, mid - amp, 1, amp * 2)
+  }
+  // the reference ruler counts bars across the whole region, cropped audio or not
+  const ruler = $('reg-ruler')
+  const bpm = Number($('in-bpm')?.value) || 96
+  const bars = Math.max(2, Math.round((state.take.length / state.sampleRate) * bpm / 240))
+  ruler.innerHTML = Array.from({ length: 10 }, (_, i) => `<span>${Math.max(1, Math.round(1 + i * (bars / 9)))}</span>`).join('')
+}
+
+function setRegion(patch) {
+  state.region = { ...state.region, ...patch }
+  paintRegion()
+  if (state.playing.length) play()
+}
+
 async function playNotes(notes, opts = {}) {
   if (!state.take?.length || !notes?.length) return
   stopPlayback()
@@ -741,10 +793,11 @@ async function playNotes(notes, opts = {}) {
   state.ctx = ctx
   const live = await shifter.ready(ctx)
   if (state.ctx !== ctx) return
-  const buffer = ctx.createBuffer(1, state.take.length, state.sampleRate)
-  buffer.copyToChannel(state.take, 0)
+  const src0 = regionWave()
+  const buffer = ctx.createBuffer(1, src0.length, state.sampleRate)
+  buffer.copyToChannel(src0, 0)
   const gain = ctx.createGain()
-  gain.gain.value = Math.pow(10, (Number($('in-gain').value) + (opts.gainDb || 0)) / 20)
+  gain.gain.value = Math.pow(10, (Number($('in-gain').value) + (opts.gainDb || 0) + state.region.gainDb) / 20)
   gain.connect(ctx.destination)
   const now = ctx.currentTime + 0.06
   const spread = (opts.spreadMs || 0) / 1000
@@ -757,12 +810,13 @@ async function playNotes(notes, opts = {}) {
     const offset = Number.isFinite(opts.offsets?.[i]) ? opts.offsets[i] : 0
     const src = ctx.createBufferSource()
     src.buffer = buffer
+    src.playbackRate.value *= state.region.rate
     if (live && !offset) {
-      const node = shifter.create(ctx, pitch)
+      const node = shifter.create(ctx, pitch + state.region.pitch)
       src.connect(node).connect(gain)
       state.live.push({ index: i, node })
     } else {
-      src.playbackRate.value = Math.pow(2, pitch / 12 + offset / 12)
+      src.playbackRate.value *= Math.pow(2, (pitch + state.region.pitch) / 12 + offset / 12)
       src.connect(gain)
     }
     src.start(now + note.start + spread * i, note.start, Math.max(0.03, note.dur))
@@ -1133,15 +1187,24 @@ async function loadDemo() {
 }
 
 // ---- export ----------------------------------------------------------------
+function gainDb(samples, db) {
+  const g = Math.pow(10, db / 20)
+  const out = new Float32Array(samples.length)
+  for (let i = 0; i < samples.length; i++) out[i] = samples[i] * g
+  return out
+}
+
 function exportWav() {
   if (!state.take?.length) throw new Error('nothing to export')
   const rate = Number($('in-rate').value)
   // Corrections are baked in before mastering, so what is exported is what
   // playback sounds like. A fully in-tune take copies through untouched.
   const tuned = state.notes.filter(n => Number.isFinite(n.shift) && Math.abs(n.shift) > 0.001)
-  const mix = tuned.length
+  let mix = tuned.length
     ? tune.renderTuned(state.take, state.notes, { sampleRate: state.sampleRate }).samples
     : state.take
+  if (state.region.reverse) { mix = Float32Array.from(mix); mix.reverse() }
+  if (state.region.gainDb) mix = gainDb(mix, state.region.gainDb)
   const { stereo, report } = masterChain(stereoFrom(mix), settings(), state.sampleRate)
   const bytes = encodeWav(stereo, rate)
   download(new Blob([bytes], { type: 'audio/wav' }), `apollo-studios-${Date.now()}.wav`)
@@ -1173,6 +1236,14 @@ function boot() {
   renderNotes()
 
   $('btn-record').addEventListener('click', guard(toggleRecord))
+  $('btn-pitch-down').addEventListener('click', () => setRegion({ pitch: Math.max(-12, state.region.pitch - 1) }))
+  $('btn-pitch-up').addEventListener('click', () => setRegion({ pitch: Math.min(12, state.region.pitch + 1) }))
+  $('btn-rate-down').addEventListener('click', () => setRegion({ rate: Math.max(0.5, Number((state.region.rate - 0.05).toFixed(2))) }))
+  $('btn-rate-up').addEventListener('click', () => setRegion({ rate: Math.min(2, Number((state.region.rate + 0.05).toFixed(2))) }))
+  $('in-reg-gain').addEventListener('input', (e) => setRegion({ gainDb: Number(e.target.value) }))
+  $('btn-reg-reverse').addEventListener('click', () => { setRegion({ reverse: !state.region.reverse }); log(`region ${state.region.reverse ? 'reversed' : 'forward'}`) })
+  $('btn-reg-retune').addEventListener('click', guard(autotune))
+  $('btn-reg-close').addEventListener('click', () => openPanel('harmony'))
   $('btn-play').addEventListener('click', guard(play))
   $('btn-stop').addEventListener('click', stopPlayback)
   $('btn-analyze').addEventListener('click', guard(readMeter))

@@ -203,20 +203,51 @@
   </div>
 
   <div class="ins-body" id="ins-body">
-    <section class="panel" id="p-take" role="tabpanel" aria-labelledby="tab-take">
-      <div class="panel-head"><h2>Editor</h2><span id="note-count" class="hint" role="status" aria-live="polite">no notes</span>
-        <div class="row tight">
-          <label>Grid <select id="in-quant" aria-label="Quantize grid">
-            <option value="0.25" selected>1/16</option><option value="0.5">1/8</option><option value="1">1/4</option>
-          </select></label>
-          <button id="btn-quantize" class="pill" type="button">Quantize</button>
-          <button id="btn-lock-scale" class="pill" type="button">Lock to scale</button>
-          <button id="btn-roll-undo" class="pill ghost" type="button">Undo edit</button>
+    <section class="panel reg" id="p-take" role="tabpanel" aria-labelledby="tab-take">
+      <div class="fxp-head">
+        <button class="ic" type="button" id="btn-reg-close" aria-label="Close editor"><span data-icon="close" aria-hidden="true"></span></button>
+        <span class="fxp-track"><span data-icon="mic" aria-hidden="true"></span> <b id="reg-name">—</b></span>
+      </div>
+      <div class="reg-body">
+        <div class="reg-controls">
+          <div class="reg-field"><span>Pitch Shift</span>
+            <button class="ic mini" type="button" id="btn-pitch-down" aria-label="Pitch shift down"><span data-icon="minus" aria-hidden="true"></span></button>
+            <output id="out-reg-pitch">0</output>
+            <button class="ic mini" type="button" id="btn-pitch-up" aria-label="Pitch shift up"><span data-icon="plus" aria-hidden="true"></span></button>
+          </div>
+          <div class="reg-field"><span>Playback Rate (Speed)</span>
+            <button class="ic mini" type="button" id="btn-rate-down" aria-label="Slower"><span data-icon="minus" aria-hidden="true"></span></button>
+            <output id="out-reg-rate">1.00</output>
+            <button class="ic mini" type="button" id="btn-rate-up" aria-label="Faster"><span data-icon="plus" aria-hidden="true"></span></button>
+          </div>
+          <div class="reg-field wide"><span>Region Gain</span>
+            <input id="in-reg-gain" type="range" min="-24" max="24" step="0.5" value="0" aria-label="Region gain"><output id="out-reg-gain">+0.0 dB</output>
+          </div>
+          <div class="reg-row">
+            <button class="pill ghost" type="button" id="btn-reg-reverse"><span data-icon="reverse" aria-hidden="true"></span> Reverse</button>
+            <button class="pill ghost" type="button" id="btn-reg-retune"><span data-icon="autopitch" aria-hidden="true"></span> Retune <span class="info" aria-hidden="true">i</span></button>
+          </div>
+          <p class="hint">Upgrade your <span aria-hidden="true">&#128081;</span> Membership</p>
+        </div>
+        <div class="reg-wave">
+          <div class="reg-ruler" id="reg-ruler" aria-hidden="true"></div>
+          <div class="reg-canvas-wrap"><canvas id="reg-wave" width="900" height="150" role="img" aria-label="Region waveform"></canvas></div>
         </div>
       </div>
-      <div class="roll-wrap"><canvas id="roll" width="1400" height="200" role="img" aria-label="Piano roll editor"></canvas></div>
-      <div id="note-list" class="notes" role="list" aria-label="Detected notes"></div>
-      <p class="hint">Each row can be deleted. The snap slider at the top of the lane sets how hard the take is pulled to the key.</p>
+      <div class="reg-notes">
+        <div class="panel-head"><span id="note-count" class="hint" role="status" aria-live="polite">no notes</span>
+          <div class="row tight">
+            <label>Grid <select id="in-quant" aria-label="Quantize grid">
+              <option value="0.25" selected>1/16</option><option value="0.5">1/8</option><option value="1">1/4</option>
+            </select></label>
+            <button id="btn-quantize" class="pill" type="button">Quantize</button>
+            <button id="btn-lock-scale" class="pill" type="button">Lock to scale</button>
+            <button id="btn-roll-undo" class="pill ghost" type="button">Undo edit</button>
+          </div>
+        </div>
+        <div class="roll-wrap"><canvas id="roll" width="1400" height="200" role="img" aria-label="Piano roll editor"></canvas></div>
+        <div id="note-list" class="notes" role="list" aria-label="Detected notes"></div>
+      </div>
     </section>
 
     <section class="panel ap" id="p-harmony" role="tabpanel" aria-labelledby="tab-harmony" hidden>
