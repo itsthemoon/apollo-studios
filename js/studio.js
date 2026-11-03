@@ -62,7 +62,7 @@ export function attach(app) {
   // the meter is a real project setting: it drives the ruler, the metronome
   // accent, the roll's bar lines and the bar-length grid targets
   state.timesig = TIME_SIGS[readStore(TIMESIG_KEY)] ? readStore(TIMESIG_KEY) : '4/4'
-  state.key = { root: Number($('in-root')?.value) || 0, scale: $('in-scale')?.value || 'chromatic' }
+  state.key = { root: Number($('in-root')?.value) || 0, scale: $('in-mode')?.value || 'chromatic' }
   /* transport clock: one object so the meter engine can read it before the
      transport section below has added its listeners */
   const transport = {
@@ -891,7 +891,7 @@ export function attach(app) {
     if (!r) return
     state.undoRoll.push(roll.cloneRoll(r))
     const root = Number($('in-root').value)
-    roll.lockToScale(r, scalePitchClasses($('in-scale').value, root), root + 48)
+    roll.lockToScale(r, scalePitchClasses($('in-mode').value, root), root + 48)
     drawRoll(); refreshRollUi()
     app.log('roll locked to scale')
   })
@@ -1520,7 +1520,7 @@ export function attach(app) {
   /* Pitch classes the active key calls in-scale. `snap()`'s pitch half and the
      roll's row tint read this, so changing the key moves the target. */
   function scalePcs() {
-    const scale = $('in-scale')?.value || 'chromatic'
+    const scale = $('in-mode')?.value || 'chromatic'
     const root = Number($('in-root')?.value) || 0
     const offsets = tune.SCALES[scale] || tune.SCALES.chromatic
     return new Set(offsets.map((i) => (((i + root) % 12) + 12) % 12))
@@ -1531,7 +1531,7 @@ export function attach(app) {
     const n = Number(midi)
     if (!Number.isFinite(n)) return 0
     const amount = clamp01(strength)
-    const scale = $('in-scale')?.value || 'chromatic'
+    const scale = $('in-mode')?.value || 'chromatic'
     if (amount <= 0 || scale === 'chromatic') return n
     const root = Number($('in-root')?.value) || 0
     return n + (tune.nearestInScale(n, root, scale) - n) * amount
@@ -1719,12 +1719,12 @@ export function attach(app) {
   /* The key feeds snap()'s pitch target: the roll tints in-key rows and a drag
      lands on the scale at the snap strength. app.js keeps the take in tune. */
   function syncKey() {
-    state.key = { root: Number($('in-root')?.value) || 0, scale: $('in-scale')?.value || 'chromatic' }
+    state.key = { root: Number($('in-root')?.value) || 0, scale: $('in-mode')?.value || 'chromatic' }
     if (activeRoll()) drawRoll()
     state.edit?.paint?.()
   }
   $('in-root')?.addEventListener('change', syncKey)
-  $('in-scale')?.addEventListener('change', syncKey)
+  $('in-mode')?.addEventListener('change', syncKey)
 
   // ---------------------------------------------------------------- metronome
   let metroCtx = null

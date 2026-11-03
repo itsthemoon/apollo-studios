@@ -255,7 +255,7 @@ export function install({ state, log } = {}) {
       tag: state.tag,
       tempo: bpm(),
       bpm: bpm(),
-      key: { root: num(Number($('in-root')?.value), 0, 0, 11), scale: $('in-scale')?.value || 'chromatic' },
+      key: { root: num(Number($('in-root')?.value), 0, 0, 11), scale: $('in-mode')?.value || 'chromatic' },
       quantize: $('in-quantize')?.checked === true,
       snapBeats: num(state.snapBeats, 0, 0, 4),
       timesig: String(state.studio?.state?.timesig || '4/4'),
@@ -377,7 +377,7 @@ export function install({ state, log } = {}) {
         }
       }
       if ($('in-root') && data.key) $('in-root').value = String(num(Number(data.key.root), 0, 0, 11))
-      if ($('in-scale') && data.key?.scale) {
+      if ($('in-mode') && data.key?.scale) {
         const option = [...$('in-scale').options].find((o) => o.value === data.key.scale)
         if (option) $('in-scale').value = data.key.scale
       }

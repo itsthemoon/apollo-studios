@@ -28,13 +28,14 @@
 
   <div class="tb-row tb-row-2">
     <span class="tb-left">
+      <button class="ic inline" type="button" aria-label="Undo" id="btn-undo"><span data-icon="undo" aria-hidden="true"></span></button>
+      <button class="ic inline" type="button" aria-label="Redo" id="btn-redo"><span data-icon="redo" aria-hidden="true"></span></button>
+      <button class="ic inline" type="button" aria-label="Musical typing" id="btn-keys"><span data-icon="keys" aria-hidden="true"></span></button>
       <button class="ic inline" type="button" aria-label="Metronome" id="btn-metro"><span data-icon="metronome" aria-hidden="true"></span></button>
       <button class="ic inline chev" type="button" aria-label="Metronome settings" data-menu="metro"><span data-icon="chevron-down" aria-hidden="true"></span></button>
       <label class="bpm"><input id="in-bpm" type="number" min="40" max="220" value="96" step="1" aria-label="Tempo"><span>bpm</span></label>
-      <span class="ts">4 / 4</span>
-      <label class="keypill"><span>Key</span><select id="in-root" aria-label="Key"></select></label>
-      <button class="ic round" type="button" aria-label="Undo" id="btn-undo"><span data-icon="undo" aria-hidden="true"></span></button>
-      <button class="ic round" type="button" aria-label="Redo" id="btn-redo"><span data-icon="redo" aria-hidden="true"></span></button>
+      <span class="ts">4/4</span>
+      <span class="keypill"><select id="in-root" aria-label="Key"></select><select id="in-mode" aria-label="Mode"></select></span>
     </span>
 
     <span class="tb-centre">
@@ -156,10 +157,6 @@
       <p class="dropzone">Drop a loop or an audio/MIDI/video file — or press Record, or <button id="btn-demo" class="linkish" type="button">load the demo take</button></p>
     </div>
 
-    <div class="scale-strip">
-      <label class="key">Scale <select id="in-scale" aria-label="Scale"></select></label>
-      <span class="hint">editor snap</span>
-    </div>
   </section>
 
   <section class="mixer" id="mixer" aria-label="Mixer" hidden>
@@ -462,12 +459,8 @@
   </div>
   <div class="tabbar-right">
     <button class="sb" type="button" data-panel-open="p-lyrics"><span data-icon="lyrics" aria-hidden="true"></span> Lyrics/Notes</button>
-    <button class="sb" type="button" data-panel-open="p-sounds"><span data-icon="sounds" aria-hidden="true"></span>My Sounds</button>
-    <button class="sb" type="button" data-panel-open="p-versions"><span data-icon="history" aria-hidden="true"></span>Versions</button>
-    <button class="sb" type="button" data-panel-open="p-master"><span data-icon="music" aria-hidden="true"></span>Mastering</button>
-    <button class="sb" type="button" data-drawer="export" id="btn-export-tab"><span data-icon="export" aria-hidden="true"></span>Export</button>
-    <button class="sb" type="button" id="btn-mixer"><span data-icon="mixer" aria-hidden="true"></span>Mixer</button>
-    <button class="sb kbd" type="button" data-modal="shortcuts"><span data-icon="shortcuts" aria-hidden="true"></span>Shortcuts</button>
+    <button class="sb" type="button" data-panel-open="p-sounds"><span data-icon="sounds" aria-hidden="true"></span>BandLab Sounds</button>
+    <button class="sb kbd" type="button" data-modal="shortcuts"><span data-icon="shortcuts" aria-hidden="true"></span><span class="kbd-glyph">&#8984;</span> Shortcuts</button>
     <span class="ready" id="status" role="status" aria-live="polite">ready</span>
   </div>
   <span id="typing-state" class="typing" hidden>musical typing: a–k</span>
@@ -476,7 +469,7 @@
 <!-- ---------------------------------------------------------------- dialogs -->
 <div class="modal" id="m-addtrack" role="dialog" aria-modal="true" aria-label="Add a track" hidden>
   <div class="sheet">
-    <div class="sheet-head"><h2>Add a track</h2><button class="ic" type="button" data-close aria-label="Close"><span data-icon="close" aria-hidden="true"></span></button></div>
+    <div class="sheet-head"><h2>New Track</h2><button class="ic" type="button" data-close aria-label="Close"><span data-icon="close" aria-hidden="true"></span></button></div>
     <div class="types" id="track-types" role="list"></div>
   </div>
 </div>
@@ -534,6 +527,9 @@
 </div>
 
 <div class="menu" id="menu-app" role="menu" hidden>
+  <button role="menuitem" type="button" data-panel-open="p-master"><span data-icon="music" aria-hidden="true"></span>Mastering</button>
+  <button role="menuitem" type="button" data-drawer="export"><span data-icon="export" aria-hidden="true"></span>Export</button>
+  <button role="menuitem" type="button" id="btn-mixer"><span data-icon="mixer" aria-hidden="true"></span>Mixer</button>
   <button role="menuitem" type="button" data-panel-open="p-versions"><span data-icon="history" aria-hidden="true"></span>Version history</button>
   <button role="menuitem" type="button" data-modal="settings"><span data-icon="settings" aria-hidden="true"></span>Settings</button>
   <button role="menuitem" type="button" data-modal="shortcuts"><span data-icon="shortcuts" aria-hidden="true"></span>Keyboard shortcuts</button>

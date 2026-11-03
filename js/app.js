@@ -177,7 +177,7 @@ function renderNotes() {
 
 function syncTuning() {
   const root = Number($('in-root').value)
-  const scale = $('in-scale').value
+  const scale = $('in-mode').value
   const amount = Number($('in-snap').value) / 100
   state.notes = tune.snapStrength(state.notes, { root, scale, amount })
   if ($('in-quantize').checked) {
@@ -914,7 +914,7 @@ function applyCharacter() {
 function autotune() {
   if (!state.notes.length) throw new Error('no notes to autotune')
   const root = Number($('in-root').value)
-  const scale = $('in-scale').value
+  const scale = $('in-mode').value
   const strength = Number($('in-snap').value)
   const amount = Math.min(1, Math.max(0, strength / 100))
   const before = state.notes.map(n => (Number.isFinite(n.origMidi) ? n.origMidi : n.midi))
@@ -1004,7 +1004,7 @@ function composeMelody() {
   const seed = Number($('in-seed').value)
   const notes = compose.generateMelody({
     root: Number($('in-root').value),
-    scale: $('in-scale').value,
+    scale: $('in-mode').value,
     steps: Number($('in-steps').value),
     bpm: Number($('in-bpm').value),
     seed,
@@ -1017,7 +1017,7 @@ function composeChords() {
   const seed = Number($('in-seed').value)
   const chords = compose.generateChords({
     root: Number($('in-root').value),
-    scale: $('in-scale').value,
+    scale: $('in-mode').value,
     bars: Number($('in-bars').value),
     bpm: Number($('in-bpm').value),
     seed,
@@ -1068,7 +1068,7 @@ function previewNote() {
 // ---- presets ---------------------------------------------------------------
 function applyPatch(patch, label) {
   $('in-root').value = String(patch.tune.root)
-  $('in-scale').value = patch.tune.scale
+  $('in-mode').value = patch.tune.scale
   $('in-snap').value = String(Math.round(patch.tune.amount * 100))
   $('out-snap').textContent = `${Math.round(patch.tune.amount * 100)}%`
   const m = patch.master
@@ -1111,7 +1111,7 @@ function renderPresets() {
 
 function currentPatch() {
   const patch = presets.makePatch($('preset-state').textContent || 'Untitled')
-  patch.tune = { root: Number($('in-root').value), scale: $('in-scale').value, amount: Number($('in-snap').value) / 100 }
+  patch.tune = { root: Number($('in-root').value), scale: $('in-mode').value, amount: Number($('in-snap').value) / 100 }
   const s = settings()
   patch.master = { eq: s.eq, comp: s.comp, limitDb: s.limitDb, targetRmsDb: s.targetRmsDb }
   patch.vocal = { gainDb: s.vocalGainDb, reverbMix: patch.vocal.reverbMix }
@@ -1217,7 +1217,7 @@ function exportWav() {
 // ---- boot ------------------------------------------------------------------
 function boot() {
   $('in-root').innerHTML = NAMES.map((n, i) => `<option value="${i}">${n}</option>`).join('')
-  $('in-scale').innerHTML = tune.scaleNames().map(n => `<option value="${n}">${n}</option>`).join('')
+  $('in-mode').innerHTML = tune.scaleNames().map(n => `<option value="${n}">${n}</option>`).join('')
   $('in-harmony').innerHTML = harmony.HARMONY_PRESETS.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
   $('in-character').innerHTML = voicechar.CHARACTERS.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
   $('in-genre').innerHTML = beat.GENRES.map(g => `<option value="${g.name}">${g.name}</option>`).join('')
@@ -1336,7 +1336,7 @@ function boot() {
 
   const retune = () => { renderNotes() }
   $('in-root').addEventListener('change', retune)
-  $('in-scale').addEventListener('change', retune)
+  $('in-mode').addEventListener('change', retune)
   $('in-bpm').addEventListener('change', retune)
   $('in-quantize').addEventListener('change', retune)
   $('in-snap').addEventListener('input', () => {
