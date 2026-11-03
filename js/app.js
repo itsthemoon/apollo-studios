@@ -1217,7 +1217,9 @@ function exportWav() {
 // ---- boot ------------------------------------------------------------------
 function boot() {
   $('in-root').innerHTML = NAMES.map((n, i) => `<option value="${i}">${n}</option>`).join('')
-  $('in-mode').innerHTML = tune.scaleNames().map(n => `<option value="${n}">${n}</option>`).join('')
+  // the project key is a root plus major or minor, as the product shows it
+  $('in-mode').innerHTML = [['major', 'maj'], ['minor', 'min']]
+    .map(([v, label]) => `<option value="${v}"${v === 'minor' ? ' selected' : ''}>${label}</option>`).join('')
   $('in-harmony').innerHTML = harmony.HARMONY_PRESETS.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
   $('in-character').innerHTML = voicechar.CHARACTERS.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
   $('in-genre').innerHTML = beat.GENRES.map(g => `<option value="${g.name}">${g.name}</option>`).join('')

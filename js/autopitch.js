@@ -128,7 +128,7 @@ export function createState(init = {}) {
   return clampState({
     preset,
     category: presetBySlug(preset).category,
-    enabled: o.enabled ?? false,
+    enabled: o.enabled ?? true,
     strength: o.strength ?? DEFAULT_STRENGTH,
     scale: o.scale ?? 'chromatic',
     tonic: o.tonic ?? 0,

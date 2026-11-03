@@ -378,8 +378,8 @@ export function install({ state, log } = {}) {
       }
       if ($('in-root') && data.key) $('in-root').value = String(num(Number(data.key.root), 0, 0, 11))
       if ($('in-mode') && data.key?.scale) {
-        const option = [...$('in-scale').options].find((o) => o.value === data.key.scale)
-        if (option) $('in-scale').value = data.key.scale
+        const option = [...$('in-mode').options].find((o) => o.value === data.key.scale)
+        if (option) $('in-mode').value = data.key.scale
       }
       if ($('in-quantize')) $('in-quantize').checked = data.quantize === true
       state.snapBeats = num(data.snapBeats, 1, 0, 4)
@@ -837,7 +837,7 @@ export function install({ state, log } = {}) {
 
   function lockScale() {
     const root = num(Number($('in-root')?.value), 0, 0, 11)
-    const name = $('in-scale')?.value || 'chromatic'
+    const name = $('in-mode')?.value || 'chromatic'
     const classes = (SCALES[name] || SCALES.chromatic).map((i) => (i + root) % 12)
     const r = activeRoll()
     const snapshot = editSnapshot()
@@ -846,7 +846,7 @@ export function install({ state, log } = {}) {
       pushEditUndo(snapshot)
       roll.lockToScale(r, classes, root + 48)
       redraw()
-      log(`locked ${r.notes.length} roll notes to ${$('in-scale')?.selectedOptions[0]?.textContent || name}`)
+      log(`locked ${r.notes.length} roll notes to ${$('in-mode')?.selectedOptions[0]?.textContent || name}`)
       return true
     }
     if (!state.notes.length) { log('lock to scale: nothing to move'); return true }

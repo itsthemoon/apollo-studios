@@ -278,10 +278,12 @@ export function install({ state, log }) {
     if (index === 0) {
       // the static clip-1 is region 0; adopt it instead of building a twin
       const legacy = row.querySelector(':scope > .clip:not([data-region-index])')
-      if (legacy) { decorate(legacy, track, 0); return legacy }
+      if (legacy) { legacy.style.setProperty('--track-color', track.color || '#00c6d1'); decorate(legacy, track, 0); return legacy }
     }
     const node = document.createElement('div')
     node.className = 'clip tl-clip'
+    // regions are tinted by the track it sits on, as the product does
+    node.style.setProperty('--track-color', track.color || '#00c6d1')
     decorate(node, track, index)
     const mine = regionAt(track, index)
     const after = [...row.querySelectorAll(':scope > .clip')].find((el) => {

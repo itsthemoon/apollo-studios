@@ -153,7 +153,7 @@ test('createState defaults', () => {
   eq(s.scale, 'chromatic')
   eq(s.tonic, 0)
   eq(s.autoDetect, true)
-  eq(s.enabled, false, 'off until the switch is hit')
+  eq(s.enabled, true, "on as soon as the panel opens on a take")
   eq(s.algorithm, 'original')
   eq(s.harmonyMix, 1)
   eq(s.category, 'essentials')

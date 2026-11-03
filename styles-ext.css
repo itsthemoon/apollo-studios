@@ -553,3 +553,9 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .keypill { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 6px; border-radius: 6px; background: #17171c; border: 1px solid #2c2c35; font-size: 11px; }
 .keypill select { appearance: none; background: none; border: 0; color: #e6e6ee; font-size: 11px; padding: 0 1px; }
 .keypill select + select { color: #9a9aa8; }
+
+/* the dock must leave room for its own tab bar */
+.tabbar { flex: 0 0 auto; }
+.dock { min-height: 0; }
+#p-harmony, #p-voice, #p-take { max-height: calc(100vh - 320px); overflow: auto; }
+.strip .knobs, .strip .knob-row { flex: 0 0 auto; }
