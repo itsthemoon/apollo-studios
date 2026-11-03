@@ -207,7 +207,8 @@ export function speedCurve(notes, sampleRate, lengthSamples) {
   if (len === 0) return curve
   for (const note of notes) {
     const snapped = note.midi
-    const orig = Number.isFinite(note.snappedFrom) ? note.snappedFrom : snapped
+    const orig = Number.isFinite(note.origMidi) ? note.origMidi
+      : Number.isFinite(note.snappedFrom) ? note.snappedFrom : snapped
     if (!Number.isFinite(snapped) || !Number.isFinite(orig) ||
         !Number.isFinite(note.start) || !Number.isFinite(note.dur)) continue
     const base = Math.pow(2, (snapped - orig) / 12)
@@ -225,4 +226,53 @@ export function speedCurve(notes, sampleRate, lengthSamples) {
     }
   }
   return curve
+}
+
+// --- Offline correction ---------------------------------------------------
+// Each note's own span resampled inside itself, so pitch moves while every
+// note stays where it was recorded and nothing drifts downstream. Edges fold
+// into the dry signal over `XF` samples; rate 1 copies through untouched.
+const XF = 0.006
+
+export function renderTuned(samples, notes, opts = {}) {
+  const rate = Number.isFinite(opts.sampleRate) && opts.sampleRate > 0 ? opts.sampleRate : 48000
+  if (!samples?.length) return { samples: new Float32Array(0), maxShift: 0 }
+  const out = Float32Array.from(samples)
+  const last = samples.length - 1
+  const xf = Math.max(2, Math.round(XF * rate))
+  let maxShift = 0
+  const voices = []
+  for (const note of notes) {
+    const snapped = Number.isFinite(note.midi) ? note.midi : null
+    if (snapped === null) continue
+    const orig = Number.isFinite(note.origMidi) ? note.origMidi
+      : Number.isFinite(note.snappedFrom) ? note.snappedFrom : snapped
+    const shift = snapped - orig
+    if (!Number.isFinite(shift) || Math.abs(shift) < 1e-4) continue
+    voices.push({ ...note, shift })
+    const h = note.harmonyMidi
+    if (Number.isFinite(h)) voices.push({ ...note, shift: h - orig, harmony: true })
+  }
+  for (const v of voices) {
+    const a = Math.max(0, Math.floor(v.start * rate))
+    const b = Math.min(samples.length, Math.ceil((v.start + v.dur) * rate))
+    const span = b - a
+    if (span < xf * 2) continue
+    const step = Math.pow(2, v.shift / 12)
+    if (Math.abs(step - 1) > maxShift) maxShift = Math.abs(step - 1)
+    const level = v.harmony ? 0.62 : 1
+    for (let i = a; i < b; i++) {
+      const src = Math.min(b - 1, a + (i - a) * step)
+      const idx = Math.floor(src)
+      const fx = src - idx
+      const sm = samples[idx] + (samples[Math.min(last, idx + 1)] - samples[idx]) * fx
+      let w = level
+      const d = i - a
+      if (d < xf) w *= 0.5 - 0.5 * Math.cos((Math.PI * d) / xf)
+      const back = b - 1 - i
+      if (back < xf) w *= 0.5 - 0.5 * Math.cos((Math.PI * back) / xf)
+      out[i] = out[i] * (1 - w) + sm * w
+    }
+  }
+  return { samples: out, maxShift }
 }

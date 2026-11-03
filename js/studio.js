@@ -10,6 +10,7 @@ import * as drums from './drums.js'
 import * as library from './library.js'
 import * as versions from './versions.js'
 import * as mastering2 from './mastering2.js'
+import * as shifter from './shifter.js'
 import * as autopitch from './autopitch.js'
 import * as shortcuts from './shortcuts.js'
 import * as fx from './fx.js'
@@ -1102,33 +1103,48 @@ export function attach(app) {
     if (autopitch.isMembership(p) && !state.member) { app.log(`${p.name} needs Apollo Pro`); openModal('get'); return }
     autopitch.setPreset(state.apState, b.dataset.ap)
     paintAp()
+    app.liveRefresh()
   })
   $('tonic-grid').addEventListener('click', (e) => {
     const b = e.target.closest('[data-tonic]')
     if (!b) return
     autopitch.setTonic(state.apState, Number(b.dataset.tonic))
     paintAp()
+    app.liveRefresh()
   })
   $('in-ap-strength').addEventListener('input', (e) => {
     autopitch.setStrength(state.apState, Number(e.target.value) / 100)
     $('out-ap-strength').textContent = `${e.target.value}%`
+    app.liveRefresh()
   })
-  $('in-ap-scale').addEventListener('change', (e) => { autopitch.setScale(state.apState, e.target.value); app.log(`scale ${e.target.value}`) })
+  $('in-ap-scale').addEventListener('change', (e) => {
+    autopitch.setScale(state.apState, e.target.value)
+    app.log(`scale ${e.target.value}`)
+    app.liveRefresh()
+  })
   $('btn-autodetect').addEventListener('click', () => {
     const res = autopitch.detectKey(state.notes.map(n => n.midi))
     if (res.confidence < 0.2) { app.log('autodetect: not enough confident notes'); return }
     autopitch.setTonic(state.apState, res.tonic)
     autopitch.setScale(state.apState, res.scale)
     paintAp()
+    app.liveRefresh()
     app.log(`autodetect: ${NAMES[res.tonic]} ${res.scale} (${Math.round(res.confidence * 100)}%)`)
   })
   $('btn-autopitch').addEventListener('click', () => {
+    app.syncTuning()   // editor snap first, so autopitch has the last word
     const tuned = autopitch.applyToNotes(state.notes, state.apState)
-    tuned.forEach((n, i) => { state.notes[i].midi = n.midi; state.notes[i].cents = n.cents })
-    app.syncTuning()
+    tuned.forEach((n, i) => {
+      state.notes[i].midi = n.midi
+      state.notes[i].cents = n.cents
+      state.notes[i].hz = n.hz
+      state.notes[i].shift = n.shift
+      state.notes[i].snappedFrom = n.snappedFrom
+    })
     app.renderNotes()
     drawRoll()
     app.log(`autopitch: ${tuned.length} notes at ${Math.round(state.apState.strength * 100)}%`)
+    app.liveRefresh()
   })
 
   // ---------------------------------------------------------------- mastering
@@ -2035,7 +2051,7 @@ export function attach(app) {
     return to - from < 0.06 ? null : { from, to }
   }
 
-  function scheduleCycle(ctx, buffer, gain, when) {
+  function scheduleCycle(ctx, buffer, gain, when, live) {
     const spb = 60 / bpmNow()
     const fromSec = transport.from * spb
     const toSec = transport.to * spb
@@ -2049,8 +2065,16 @@ export function attach(app) {
       const shift = Number.isFinite(note.shift) ? note.shift : (Number(note.cents) || 0) / 100
       const src = ctx.createBufferSource()
       src.buffer = buffer
-      src.playbackRate.value = Math.pow(2, shift / 12)
-      src.connect(gain)
+      // same live path as plain playback: a node seeded with the current shift
+      // so a parameter drag moves it
+      const entry = live ? { index: state.notes.indexOf(note), node: shifter.create(ctx, shift) } : null
+      if (entry) {
+        src.connect(entry.node).connect(gain)
+        state.live.push(entry)
+      } else {
+        src.playbackRate.value = Math.pow(2, shift / 12)
+        src.connect(gain)
+      }
       tapSource(src)
       const at = when + Math.max(0, start - fromSec) * 1
       src.start(at, start + skip, dur)
@@ -2087,7 +2111,7 @@ export function attach(app) {
     metroStop()
   }
 
-  function startLoopPlay(spec) {
+  async function startLoopPlay(spec) {
     stopLoopPlay()
     const ctx = new AudioContext({ sampleRate: state.sampleRate })
     ctx.resume?.().catch(() => {})
@@ -2104,11 +2128,13 @@ export function attach(app) {
     gain.connect(ctx.destination)
     const buffer = ctx.createBuffer(1, state.take.length, state.sampleRate)
     buffer.copyToChannel(state.take, 0)
+    const live = await shifter.ready(ctx)
+    state.live = []
     placePlayhead(spec.from)
     let cycle = transport.t0
     const pump = () => {
       while (cycle < ctx.currentTime + 0.4) {
-        scheduleCycle(ctx, buffer, gain, cycle)
+        scheduleCycle(ctx, buffer, gain, cycle, live)
         cycle += transport.len
       }
     }

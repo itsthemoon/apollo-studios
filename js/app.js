@@ -2,6 +2,8 @@
 import * as capture from './capture.js'
 import * as pitch from './pitch.js'
 import * as tune from './tune.js'
+import * as shifter from './shifter.js'
+import * as autopitch from './autopitch.js'
 import * as presets from './presets.js'
 import * as harmony from './harmony.js'
 import * as voicechar from './voicechar.js'
@@ -33,6 +35,7 @@ const state = {
   selected: null,
   rec: null,
   playing: [],
+  live: [],
   ctx: null,
   harmonies: [],
   stems: null,
@@ -715,17 +718,29 @@ async function toggleRecord() {
 function stopPlayback() {
   state.playing.forEach(src => { try { src.stop() } catch { /* already done */ } })
   state.playing = []
+  state.live = []
   state.ctx?.close()
   state.ctx = null
   $('btn-play').disabled = !state.notes.length
   $('btn-stop').disabled = true
 }
 
-function playNotes(notes, opts = {}) {
+// Live correction: every sounding note owns a shifter node, and any parameter
+// drag re-posts the current shift into it, so the sound moves under the finger.
+function liveRefresh() {
+  if (!state.live?.length) return
+  state.live.forEach(({ index, node }) => {
+    shifter.set(node, autopitch.liveShift(state.notes[index], state.apState))
+  })
+}
+
+async function playNotes(notes, opts = {}) {
   if (!state.take?.length || !notes?.length) return
   stopPlayback()
   const ctx = new AudioContext({ sampleRate: state.sampleRate })
   state.ctx = ctx
+  const live = await shifter.ready(ctx)
+  if (state.ctx !== ctx) return
   const buffer = ctx.createBuffer(1, state.take.length, state.sampleRate)
   buffer.copyToChannel(state.take, 0)
   const gain = ctx.createGain()
@@ -733,6 +748,7 @@ function playNotes(notes, opts = {}) {
   gain.connect(ctx.destination)
   const now = ctx.currentTime + 0.06
   const spread = (opts.spreadMs || 0) / 1000
+  state.live = []
   notes.forEach((note, i) => {
     const cents = Number.isFinite(note.cents) ? note.cents : 0
     // `shift` is the real transposition applied by tuning; fall back to the
@@ -741,8 +757,14 @@ function playNotes(notes, opts = {}) {
     const offset = Number.isFinite(opts.offsets?.[i]) ? opts.offsets[i] : 0
     const src = ctx.createBufferSource()
     src.buffer = buffer
-    src.playbackRate.value = Math.pow(2, pitch / 12 + offset / 12)
-    src.connect(gain)
+    if (live && !offset) {
+      const node = shifter.create(ctx, pitch)
+      src.connect(node).connect(gain)
+      state.live.push({ index: i, node })
+    } else {
+      src.playbackRate.value = Math.pow(2, pitch / 12 + offset / 12)
+      src.connect(gain)
+    }
     src.start(now + note.start + spread * i, note.start, Math.max(0.03, note.dur))
     state.playing.push(src)
   })
@@ -1116,10 +1138,16 @@ async function loadDemo() {
 function exportWav() {
   if (!state.take?.length) throw new Error('nothing to export')
   const rate = Number($('in-rate').value)
-  const { stereo, report } = masterChain(stereoFrom(state.take), settings(), state.sampleRate)
+  // Corrections are baked in before mastering, so what is exported is what
+  // playback sounds like. A fully in-tune take copies through untouched.
+  const tuned = state.notes.filter(n => Number.isFinite(n.shift) && Math.abs(n.shift) > 0.001)
+  const mix = tuned.length
+    ? tune.renderTuned(state.take, state.notes, { sampleRate: state.sampleRate }).samples
+    : state.take
+  const { stereo, report } = masterChain(stereoFrom(mix), settings(), state.sampleRate)
   const bytes = encodeWav(stereo, rate)
   download(new Blob([bytes], { type: 'audio/wav' }), `apollo-studios-${Date.now()}.wav`)
-  log(`exported ${bytes.length} bytes @ ${rate} Hz, peak ${report.peakDb.toFixed(2)} dB, gain ${report.gainDb.toFixed(2)} dB`)
+  log(`exported ${bytes.length} bytes @ ${rate} Hz, peak ${report.peakDb.toFixed(2)} dB, gain ${report.gainDb.toFixed(2)} dB${tuned.length ? `, ${tuned.length} notes tuned` : ''}`)
   status('exported')
 }
 
@@ -1269,7 +1297,8 @@ function boot() {
     },
     split,
   }
-  const app = { state, log, status, openPanel, playheadSeconds, syncTuning, renderNotes, renderBands, exportWav }
+  const app = { state, log, status, openPanel, playheadSeconds, syncTuning, renderNotes, renderBands, exportWav, liveRefresh }
+  window.__app = app // probe hook: tests read the model through this
   state.studio = attachStudio(app)
   installPanels({ state, log })
   installTimeline({ state, log })

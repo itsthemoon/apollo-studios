@@ -104,36 +104,44 @@ export function clampState(state) {
 
 export function setPreset(state, slug) {
   if (!presetBySlug(slug)) throw new Error('unknown autopitch preset')
-  return clampState({ ...clampState(state), preset: slug })
+  return assign(state, clampState({ ...clampState(state), preset: slug }))
+}
+
+// Setters write through to the object the caller holds *and* return it: the
+// panels keep a long-lived state and only some call sites reassign, so a pure
+// copy here leaves the UI silently inert.
+function assign(state, next) {
+  for (const k of Object.keys(next)) state[k] = next[k]
+  return state
 }
 
 export function setStrength(state, value) {
-  return clampState({ ...clampState(state), strength: value })
+  return assign(state, clampState({ ...clampState(state), strength: value }))
 }
 
 export function setScale(state, scale) {
   if (!Object.hasOwn(SCALES, scale)) throw new Error('unknown scale')
-  return clampState({ ...clampState(state), scale })
+  return assign(state, clampState({ ...clampState(state), scale }))
 }
 
 export function setTonic(state, tonic) {
   if (!Number.isInteger(tonic)) throw new Error('tonic must be an integer')
-  return clampState({ ...clampState(state), tonic })
+  return assign(state, clampState({ ...clampState(state), tonic }))
 }
 
 export function setAutoDetect(state, on) {
-  return clampState({ ...clampState(state), autoDetect: Boolean(on) })
+  return assign(state, clampState({ ...clampState(state), autoDetect: Boolean(on) }))
 }
 
 // Partial merge: only the keys present are touched.
 export function setAdvanced(state, opts = {}) {
   const s = clampState(state)
   const o = opts ?? {}
-  return clampState({
+  return assign(state, clampState({
     ...s,
     formant: o.formant === undefined ? s.formant : o.formant,
     humanise: o.humanise === undefined ? s.humanise : o.humanise,
-  })
+  }))
 }
 
 // ---- key detection ---------------------------------------------------------
@@ -183,9 +191,22 @@ export function detectKey(midiNotes) {
 
 // ---- application -----------------------------------------------------------
 
+// How far one note moves under the current state, in semitones. Playback asks
+// this every frame while a parameter is dragged, so it must stay cheap and
+// total (never throws on a bare note).
+export function liveShift(note, state) {
+  if (!note) return 0
+  try {
+    return applyToNotes([note], state)[0].shift ?? 0
+  } catch {
+    return 0
+  }
+}
+
 // Tuned copies of `notes`. `strength` × the preset's bias is how far each note
 // travels toward the nearest in-scale tone; 0 leaves the pitch untouched.
-// Adds `.cents` (offset of the result from the target) and `.snappedFrom`, and
+// Adds `.cents` (offset of the result from the target), `.shift` (semitones of
+// transposition playback must apply), `.snappedFrom`, and
 // `.harmonyMidi`/`.harmonyHz` when the preset carries a harmony voice.
 export function applyToNotes(notes, state) {
   if (!Array.isArray(notes)) throw new Error('notes must be an array')
@@ -193,7 +214,12 @@ export function applyToNotes(notes, state) {
   const preset = presetBySlug(s.preset)
   const amount = clamp01(s.strength * preset.correctionBias)
   return notes.map((note) => {
-    const orig = noteMidi(note)
+    // The recorded take pitch, not whatever a previous pass left in `hz`, so
+    // tuning twice lands in the same place instead of stacking.
+    // `origMidi` is the pitch as recorded; `snappedFrom` may already be a
+    // previous pass's result once the editor has moved the note.
+    const orig = Number.isFinite(note.origMidi) ? note.origMidi
+      : Number.isFinite(note.snappedFrom) ? note.snappedFrom : noteMidi(note)
     if (orig === null) return { ...note }
     const target = nearestInScale(orig, s.tonic, s.scale)
     const midi = orig + amount * (target - orig)
@@ -202,6 +228,7 @@ export function applyToNotes(notes, state) {
       midi,
       hz: midiToHz(midi),
       cents: round6((midi - target) * 100),
+      shift: round6(midi - orig),
       snappedFrom: orig,
     }
     if (preset.harmonySemitones !== 0) {

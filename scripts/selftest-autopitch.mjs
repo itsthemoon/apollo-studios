@@ -22,6 +22,7 @@ const {
   setAdvanced,
   detectKey,
   applyToNotes,
+  liveShift,
 } = a
 
 const FREE = ['classic', 'duet', 'big-harmony']
@@ -218,15 +219,18 @@ test('setAdvanced merges only the keys given and clamps', () => {
   eq(setAdvanced(createState(), null).humanise, 0.5, 'null merge is a no-op')
 })
 
-test('setters never mutate their input', () => {
+test('setters write through, and still return the new state', () => {
+  // the panels hold one long-lived state and only some call sites reassign, so
+  // a pure copy here leaves every control silently inert
   const s = createState({ preset: 'third', strength: 0.4 })
-  const snapshot = JSON.stringify(s)
-  setPreset(s, 'chip')
+  eq(setPreset(s, 'chip'), s)
   setStrength(s, 0.9)
   setScale(s, 'major')
   setTonic(s, 7)
-  setAdvanced(s, { formant: 3 })
-  eq(JSON.stringify(s), snapshot)
+  eq(s.preset, 'chip')
+  eq(s.strength, 0.9)
+  eq(s.scale, 'major')
+  eq(s.tonic, 7)
 })
 
 // ---- detectKey -------------------------------------------------------------
@@ -318,6 +322,21 @@ test('applyToNotes at strength 0 leaves the pitch exactly alone', () => {
   eq(out[0].midi, 60.4)
   eq(out[0].snappedFrom, 60.4)
   eq(out[0].cents, 40, '40 cents sharp of C')
+})
+
+test('applyToNotes reports the transposition playback needs', () => {
+  const out = applyToNotes([note(60.4)], createState({ strength: 1, scale: 'major' }))
+  near(out[0].shift, -0.4, 1e-6, 'a 40 cent sharp note is pulled down 0.4 semitones')
+  const none = applyToNotes([note(60.4)], createState({ strength: 0, scale: 'major' }))
+  near(none[0].shift, 0, 1e-6, 'strength 0 shifts nothing')
+})
+
+test('liveShift matches what applyToNotes would bake', () => {
+  const st = createState({ strength: 1, scale: 'major' })
+  const n = note(60.4)
+  near(liveShift(n, st), applyToNotes([n], st)[0].shift, 1e-9)
+  near(liveShift(n, createState({ strength: 0 })), 0, 1e-9, 'silent when strength is 0')
+  near(liveShift(null, st), 0, 1e-9, 'no note, no shift')
 })
 
 test('applyToNotes at strength 1 snaps to the scale', () => {

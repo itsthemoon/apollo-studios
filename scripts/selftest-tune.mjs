@@ -9,6 +9,7 @@ import {
   nearestInScale,
   snapNotes,
   snapStrength,
+  renderTuned,
   quantizeStarts,
   speedCurve,
 } from '../js/tune.js'
@@ -155,6 +156,44 @@ test('snapStrength: amount 1 fully snaps', () => {
   const out = snapStrength([{ start: 0, dur: 0.1, midi: 61, hz: midiToHz(61) }], { root: 60, scale: 'major', amount: 1 })
   eq(out[0].midi, 60)
   near(out[0].cents, 0, 1e-6)
+})
+
+test('snapStrength: re-snapping a tuned note holds its place', () => {
+  const once = snapStrength([{ start: 0, dur: 0.1, midi: 60.4, hz: midiToHz(60.4), origMidi: 60.4 }], { root: 60, scale: 'major', amount: 1 })
+  const twice = snapStrength(once, { root: 60, scale: 'major', amount: 1 })
+  eq(once[0].midi, 60)
+  eq(twice[0].midi, 60, 'second pass must not travel past the target')
+})
+
+test('renderTuned: an in-tune note leaves the samples alone', () => {
+  const rate = 8000
+  const src = Float32Array.from({ length: rate }, (_, i) => Math.sin((2 * Math.PI * 440 * i) / rate))
+  const { samples } = renderTuned(src, [{ start: 0, dur: 1, midi: 69, snappedFrom: 69 }], { sampleRate: rate })
+  eq(samples.length, src.length)
+  let diff = 0
+  for (let i = 0; i < src.length; i++) diff = Math.max(diff, Math.abs(samples[i] - src[i]))
+  near(diff, 0, 1e-6, 'bit-for-bit at rate 1')
+})
+
+test('renderTuned: a snapped note is transposed in the samples', () => {
+  const rate = 8000
+  const src = Float32Array.from({ length: rate }, (_, i) => Math.sin((2 * Math.PI * 440 * i) / rate))
+  const zero = (a) => { let n = 0; for (let i = 1; i < a.length; i++) if (a[i - 1] < 0 && a[i] >= 0) n++; return n }
+  const up = renderTuned(src, [{ start: 0, dur: 1, midi: 70, snappedFrom: 69 }], { sampleRate: rate }).samples
+  const head = up.subarray(0, rate / 2) // the curve unwinds over the note's tail
+  near(zero(head) / (head.length / rate), 466.2, 8, 'a semitone up is 466 Hz')
+  near(up.length, src.length, 0, 'length is preserved, not varispeed')
+})
+
+test('renderTuned: a shifted note does not drag the timeline', () => {
+  const rate = 8000
+  const src = Float32Array.from({ length: rate }, (_, i) => Math.sin((2 * Math.PI * 440 * i) / rate))
+  const note = { start: 0.25, dur: 0.5, midi: 70, origMidi: 69 }
+  const { samples } = renderTuned(src, [note], { sampleRate: rate })
+  // the sample just past the note must still line up with the dry take
+  const edge = Math.ceil((note.start + note.dur) * rate)
+  near(samples[edge], src[edge], 1e-6, 'after the note the dry timeline continues')
+  near(samples[edge + 400], src[edge + 400], 1e-6)
 })
 
 test('quantizeStarts: 0.13 s lands on 0.125 s at 120 bpm / division 4', () => {
