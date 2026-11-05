@@ -27,7 +27,7 @@ export function openPanel(name) {
   btn?.click()
 }
 
-function openModal(name) {
+export function openModal(name) {
   const el = document.getElementById('m-' + name)
   if (!el) return
   document.querySelectorAll('.menu').forEach((m) => { m.hidden = true })
