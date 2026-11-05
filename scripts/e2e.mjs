@@ -490,6 +490,27 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(14, 'region pitch and reverse change the exported bytes', `
+probe("document.getElementById('tab-take').click()")
+time.sleep(0.3)
+probe("document.getElementById('btn-pitch-down').click(); document.getElementById('btn-pitch-down').click();"
+      " document.getElementById('btn-pitch-down').click(); document.getElementById('btn-pitch-down').click()")
+probe("document.getElementById('btn-reg-reverse').click()")
+time.sleep(0.4)
+probe("var b = window.VS.exportBuffer().bytes; var h = 0;"
+      " for (var i = 0; i < b.length; i += 97) h = (h * 31 + b[i]) % 2147483647;"
+      " window.__h1 = h; window.__n1 = b.length")
+probe("document.getElementById('btn-reg-reverse').click()")
+probe("document.getElementById('btn-pitch-up').click(); document.getElementById('btn-pitch-up').click();"
+      " document.getElementById('btn-pitch-up').click(); document.getElementById('btn-pitch-up').click()")
+time.sleep(0.3)
+emit(probe("var b = window.VS.exportBuffer().bytes; var h = 0;"
+           " for (var i = 0; i < b.length; i += 97) h = (h * 31 + b[i]) % 2147483647;"
+           " return JSON.stringify({h1: window.__h1, n1: window.__n1, h2: h, n2: b.length})"))
+`, d => d.h1 && d.h2 && d.h1 !== d.h2 && d.n1 === d.n2
+      ? { pass: true, detail: `${d.n1} byte render hashes ${d.h1} with -4 semitones and reverse, ${d.h2} without — the edits are baked in` }
+      : { pass: false, detail: `first=${show(d.h1)}/${show(d.n1)} second=${show(d.h2)}/${show(d.n2)}` })
+
 step(13, 'a note can be added and dragged in the roll', `
 emit(probe("document.querySelector('[data-modal=\\\"addtrack\\\"]').click(); return JSON.stringify({ok:true})"))
 time.sleep(0.5)

@@ -1248,7 +1248,8 @@ function gainDb(samples, db) {
   return out
 }
 
-function exportWav() {
+// the bytes, without the download: tests hash this to prove the edits are baked in
+function exportBuffer() {
   if (!state.take?.length) throw new Error('nothing to export')
   const rate = Number($('in-rate').value)
   // Corrections are baked in before mastering, so what is exported is what
@@ -1261,8 +1262,13 @@ function exportWav() {
   if (state.region.gainDb) mix = gainDb(mix, state.region.gainDb)
   const { stereo, report } = masterChain(stereoFrom(mix), settings(), state.sampleRate)
   const bytes = encodeWav(stereo, rate)
+  return { bytes, report, tuned: tuned.length, rate }
+}
+
+function exportWav() {
+  const { bytes, report, tuned, rate } = exportBuffer()
   download(new Blob([bytes], { type: 'audio/wav' }), `apollo-studios-${Date.now()}.wav`)
-  log(`exported ${bytes.length} bytes @ ${rate} Hz, peak ${report.peakDb.toFixed(2)} dB, gain ${report.gainDb.toFixed(2)} dB${tuned.length ? `, ${tuned.length} notes tuned` : ''}`)
+  log(`exported ${bytes.length} bytes @ ${rate} Hz, peak ${report.peakDb.toFixed(2)} dB, gain ${report.gainDb.toFixed(2)} dB${tuned ? `, ${tuned} notes tuned` : ''}`)
   status('exported')
 }
 
@@ -1410,6 +1416,7 @@ function boot() {
     get state() { return state },
     setState(next) { state.notes = next.notes ?? state.notes; renderNotes() },
     exportWav,
+    exportBuffer,
     loadDemo,
     autotune,
     drawWave,
