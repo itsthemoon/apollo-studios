@@ -895,6 +895,9 @@ export function attach(app) {
     return { beat, midi: r.lowMidi + (ROWS - 1 - row) }
   }
   $('roll').addEventListener('pointerdown', (e) => {
+    // edit.js owns the roll once it installs (drag, marquee, add-on-tap); this is
+    // the fallback path only
+    if (state.edit) return
     const r = activeRoll()
     if (!r) { app.log('add an instrument track to use the roll'); return }
     const { beat, midi } = rollPoint(e)

@@ -290,7 +290,8 @@
 
 /* the take panel owns the dock height: the roll grows, the list and hint stay put */
 #p-take:not([hidden]) { display: flex; flex-direction: column; height: 100%; }
-#p-take .roll-wrap { flex: 0 1 auto; min-height: 96px; max-height: 152px; }
+#p-take .roll-wrap { flex: 0 1 auto; min-height: 100px; max-height: 140px; }
+.roll-wrap canvas { width: 100%; display: block; }
 #p-take .roll-wrap canvas { height: 100%; display: block; }
 #p-take #roll { height: 100%; }
 
@@ -556,8 +557,12 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 
 /* ---- Editor (region) panel: measured against the shipping product --------- */
 .panel.reg { padding: 10px 12px 12px; }
-.reg-body { display: grid; grid-template-columns: 265px 1fr; gap: 16px; align-items: start; }
-.reg-controls { display: grid; gap: 9px; }
+/* the controls are one wrap row now that the wave and roll sit below them */
+.reg-body { display: block; }
+.reg-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.reg-controls .hint { margin: 0; }
+.reg-field > span { flex: 0 0 auto; }
+.reg-field.wide { min-width: 240px; }
 .reg-field { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #8b8b98; }
 .reg-field > span { flex: 1 1 auto; }
 .reg-field output { min-width: 34px; text-align: center; font-size: 12px; color: #e6e6ee; }
@@ -569,8 +574,8 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .reg-ruler { position: relative; height: 16px; font-size: 9px; color: #7c7c8e; border-bottom: 1px solid #23232b; }
 .reg-ruler span { position: absolute; top: 2px; transform: translateX(-0.5px); }
 .reg-cols { margin-bottom: 12px; }
-.reg-canvas-wrap { height: 118px; border-radius: 6px; background: #101015; border: 1px solid #23232b; overflow: hidden; }
-.reg-canvas-wrap canvas { width: 100%; height: 118px; display: block; }
+.reg-canvas-wrap { height: 96px; border-radius: 6px; background: #101015; border: 1px solid #23232b; overflow: hidden; }
+.reg-canvas-wrap canvas { width: 100%; height: 96px; display: block; }
 .reg-notes { margin-top: 10px; border-top: 1px solid #23232b; padding-top: 8px; }
 
 /* ---- transport key pill --------------------------------------------------- */
@@ -619,6 +624,8 @@ input[type="range"] { accent-color: var(--accent, #00c6d1); }
 
 /* the wave and the note list share a row, so the list never falls below the fold */
 .reg-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
+.reg-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.reg-main .roll-wrap { flex: 0 0 150px; }
 .notes-side { display: flex; flex-direction: column; min-height: 0; max-height: 190px; }
 .notes-side .notes { flex: 1 1 auto; min-height: 0; max-height: none; }
 .notes-side .notes-head { padding-top: 2px; }

@@ -21,7 +21,9 @@ import { rollBounds, rollPoint, ROLL_GUTTER } from './studio.js'
 const $ = (id) => document.getElementById(id)
 
 const MAX_UNDO = 50
-const HIT_PAD = 3
+// a snapped note sits up to half a grid step off the pixel that made it, so the
+// grab band has to cover a grid step at normal zoom
+const HIT_PAD = 7
 const TAP_PX = 3
 const GHOST_MS = 1400
 const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']

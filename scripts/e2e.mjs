@@ -76,6 +76,16 @@ def key(name, mods=0, SID=SID):
     cdp("Input.dispatchKeyEvent", session_id=SID, type="keyUp", key=name, modifiers=mods)
     time.sleep(0.25)
 
+def roll_drag(x, y, dx, dy, SID=SID):
+    """Press on the roll, move in steps, release: the pointer drag the editor reads."""
+    cdp("Input.dispatchMouseEvent", session_id=SID, type="mousePressed", x=x, y=y, button="left", buttons=1, clickCount=1)
+    for i in range(1, 7):
+        time.sleep(0.03)
+        cdp("Input.dispatchMouseEvent", session_id=SID, type="mouseMoved", x=x + dx * i / 6, y=y + dy * i / 6, button="left", buttons=1)
+    time.sleep(0.03)
+    cdp("Input.dispatchMouseEvent", session_id=SID, type="mouseReleased", x=x + dx, y=y + dy, button="left", buttons=0, clickCount=1)
+    time.sleep(0.3)
+
 def setval(sel, val, evt):
     return probe("var e=document.querySelector(" + json.dumps(sel) + ");"
                  " if(!e) return JSON.stringify({missing:true});"
@@ -480,6 +490,24 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(13, 'a note can be added and dragged in the roll', `
+emit(probe("document.querySelector('[data-modal=\\\"addtrack\\\"]').click(); return JSON.stringify({ok:true})"))
+time.sleep(0.5)
+probe("document.querySelectorAll('#track-types button')[1].click()")
+time.sleep(0.7)
+emit(click("#tab-take"))
+time.sleep(0.4)
+box = probe("var b=document.getElementById('roll').getBoundingClientRect(); return JSON.stringify({x:Math.round(b.x+b.width*0.35), y:Math.round(b.y+b.height*0.5)})")
+before = probe("var r=window.__app.state.rolls.get(window.__app.state.active); return JSON.stringify({n:r?r.notes.length:-1})")
+roll_drag(box["x"], box["y"], 0, 0)
+mid = probe("var r=window.__app.state.rolls.get(window.__app.state.active); var n=r&&r.notes[0]; return JSON.stringify({n:r?r.notes.length:-1, note:n?[+n.start.toFixed(2), n.midi]:null})")
+roll_drag(box["x"], box["y"], 108, -36)
+after = probe("var r=window.__app.state.rolls.get(window.__app.state.active); var n=r&&r.notes[0]; return JSON.stringify({n:r?r.notes.length:-1, note:n?[+n.start.toFixed(2), n.midi]:null})")
+emit({**before, "added": mid.get("n"), "from": mid.get("note"), "to": after.get("note"), "kept": after.get("n")})
+`, d => d.added == d.n + 1 && d.to && d.from && (d.to[0] !== d.from[0] || d.to[1] !== d.from[1])
+      ? { pass: true, detail: `tap added a note (${d.n} → ${d.added}), drag moved it ${d.from} → ${d.to}` }
+      : { pass: false, detail: `before=${d.n} added=${d.added} from=${show(d.from)} to=${show(d.to)}` })
+
 step(12, 'playing drives the strip meters and mute cuts the strip', `
 emit(click("#btn-mixer"))
 time.sleep(0.6)
