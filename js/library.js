@@ -14,6 +14,7 @@
 // Sounds browser shows them behind the join wall. Six of the twelve packs are free.
 
 export const CATEGORIES = Object.freeze([
+  Object.freeze({ slug: 'mine', label: 'My Sounds' }),
   Object.freeze({ slug: 'ambient-electronica', label: 'Ambient Electronica' }),
   Object.freeze({ slug: 'ricch-rap-trap', label: 'Ricch Rap Trap' }),
   Object.freeze({ slug: 'pop-punk', label: 'Pop Punk' }),
@@ -187,6 +188,34 @@ export const PACKS = Object.freeze([
 
 // 40 samples, four per free pack and two or three per locked pack. bpm and key are
 // copied from the parent pack so a preview never has to look at two records.
+// Uploads live beside the factory list, in memory only: the buffers are far too
+// big for the project slot, so a reload drops them like a take.
+const USER = []
+
+export function addUserSample({ name, data, rate, bpm = 96 }) {
+  if (!data?.length || !(rate > 0)) throw new Error('an upload needs decoded audio')
+  const base = String(name || 'upload').replace(/\.[a-z0-9]+$/i, '').trim().slice(0, 40) || 'upload'
+  const sample = Object.freeze({
+    slug: `user-${Date.now()}-${USER.length}`,
+    name: base,
+    pack: 'Uploads',
+    author: 'You',
+    kind: 'sample',
+    category: 'mine',
+    user: true,
+    bpm,
+    key: 'C',
+    data,
+    rate,
+  })
+  USER.push(sample)
+  return sample
+}
+
+export function userSamples() {
+  return USER.slice()
+}
+
 export const SAMPLE_LIST = Object.freeze([
   Object.freeze({
     slug: 'still-air-pad',
@@ -670,6 +699,7 @@ function packFor(slug) {
 // Partial words count ('rhod' finds Warped Rhodes) and an empty or non-string query
 // returns [] rather than the whole library, so the browser can show its own landing state.
 export function search(query) {
+  const mineHits = USER.filter((s) => s.name.toLowerCase().includes(String(query || '').toLowerCase()))
   const q = normaliseQuery(query)
   if (!q) return []
   const hits = []
@@ -688,10 +718,11 @@ export function search(query) {
     if (haystack.includes(q)) hits.push(sample)
     if (hits.length >= SEARCH_LIMIT) break
   }
-  return hits.sort(byName)
+  return [...mineHits, ...hits.sort(byName)]
 }
 
 export function byCategory(slug) {
+  if (slug === 'mine') return USER.slice()
   if (!CATEGORY_BY_SLUG.has(slug)) return []
   const out = []
   for (const sample of SAMPLE_LIST) {

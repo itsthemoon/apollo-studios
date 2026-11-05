@@ -857,8 +857,11 @@ async function playNotes(notes, opts = {}) {
   stopPlayback()
   const ctx = new AudioContext({ sampleRate: state.sampleRate })
   state.ctx = ctx
+  // a context made after a run of others can come up suspended; without this
+  // the transport "plays" against a stopped clock and every meter reads zero
+  ctx.resume?.().catch(() => {})
   const live = await shifter.ready(ctx)
-  if (state.ctx !== ctx) return
+  if (state.ctx !== ctx) { ctx.close?.(); return }
   const src0 = regionWave()
   const buffer = ctx.createBuffer(1, src0.length, state.sampleRate)
   buffer.copyToChannel(src0, 0)

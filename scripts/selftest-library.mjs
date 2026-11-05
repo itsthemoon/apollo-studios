@@ -28,9 +28,10 @@ const PACK_SLUGS = new Set(PACKS.map((p) => p.slug))
 const SAMPLE_SLUGS = new Set(SAMPLE_LIST.map((s) => s.slug))
 const packBy = new Map(PACKS.map((p) => [p.slug, p]))
 
-test('categories: eight, exact order, unique, slug-shaped, labelled', () => {
-  eq(CATEGORIES.length, 8, 'eight categories')
+test('categories: the eight factory packs in order, then My Sounds first-class', () => {
+  eq(CATEGORIES.length, 9, 'eight factory categories plus mine')
   const expected = [
+    'mine',
     'ambient-electronica',
     'ricch-rap-trap',
     'pop-punk',
@@ -48,8 +49,8 @@ test('categories: eight, exact order, unique, slug-shaped, labelled', () => {
     ok(category.label === category.label.replace(/\s+/g, ' '), 'label has single spaces')
     eq(category.label[0], category.label[0].toUpperCase(), 'label is capitalised')
   }
-  eq(new Set(CATEGORIES.map((c) => c.slug)).size, 8, 'category slugs unique')
-  eq(new Set(CATEGORIES.map((c) => c.label)).size, 8, 'category labels unique')
+  eq(new Set(CATEGORIES.map((c) => c.slug)).size, 9, 'category slugs unique')
+  eq(new Set(CATEGORIES.map((c) => c.label)).size, 9, 'category labels unique')
   ok(Object.isFrozen(CATEGORIES), 'categories frozen')
 })
 
@@ -87,7 +88,8 @@ test('packs: every field is well formed', () => {
 
 test('packs: every category is used and pair-heavy categories exist', () => {
   const used = new Set(PACKS.map((p) => p.category))
-  for (const category of CATEGORY_SLUGS) ok(used.has(category), `category ${category} has a pack`)
+  // 'mine' holds uploads, so it never has a pack card
+  for (const category of [...CATEGORY_SLUGS].filter((c) => c !== 'mine')) ok(used.has(category), `category ${category} has a pack`)
   const counts = new Map()
   for (const pack of PACKS) counts.set(pack.category, (counts.get(pack.category) ?? 0) + 1)
   const paired = [...counts.values()].filter((n) => n > 1).length
@@ -332,7 +334,8 @@ test('dataset invariants hold together', () => {
     ok(!SAMPLE_SLUGS.has(pack.slug), `pack slug ${pack.slug} not reused by a sample`)
     ok(byPack(pack.slug).length > 0, `pack ${pack.slug} is not empty`)
   }
-  for (const category of CATEGORIES) ok(byCategory(category.slug).length > 0, `category ${category.slug} not empty`)
+  // mine is the upload bucket: empty until something is uploaded
+  for (const category of CATEGORIES.filter((c) => c.slug !== 'mine')) ok(byCategory(category.slug).length > 0, `category ${category.slug} not empty`)
   for (const pack of FREE_PACKS) ok(pack.locked === false, `free pack ${pack.slug} unlocked`)
   for (const pack of MEMBERSHIP_PACKS) ok(pack.locked === true, `locked pack ${pack.slug}`)
 })

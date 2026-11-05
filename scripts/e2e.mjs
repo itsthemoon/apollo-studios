@@ -492,6 +492,34 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(21, 'an uploaded sound decodes into My Sounds', `
+probe("document.querySelector('#menu-create [data-create=sounds]').click()")
+time.sleep(0.4)
+probe("var b = document.createElement('button'); b.dataset.scat = 'mine'; document.getElementById('sound-cats').append(b);")
+emit(probe("return JSON.stringify({cat: document.querySelector('#sound-cats .on')?.textContent || null, before: document.querySelectorAll('#sound-list .snd').length})"))
+probe("""
+  var rate = 48000, n = rate / 2
+  var buf = new ArrayBuffer(44 + n * 2), dv = new DataView(buf)
+  var w = (o, s) => { for (var i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)) }
+  w(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt ')
+  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true)
+  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true)
+  w(36, 'data'); dv.setUint32(40, n * 2, true)
+  for (var i = 0; i < n; i++) dv.setInt16(44 + i * 2, Math.sin(i / 20) * 12000, true)
+  var input = document.getElementById('file-sound')
+  var dt = new DataTransfer()
+  dt.items.add(new File([buf], 'e2e-tone.wav', { type: 'audio/wav' }))
+  input.files = dt.files
+  input.dispatchEvent(new Event('change'))
+""")
+time.sleep(1.2)
+emit(probe("var rows = [...document.querySelectorAll('#sound-list .snd b')].map((b) => b.textContent);"
+           " return JSON.stringify({rows: rows, uploaded: window.VS.state.sound?.name || null,"
+           " log: (document.getElementById('log') || {}).textContent || ''})"))
+`, d => d.rows.includes('e2e-tone') && d.uploaded === 'e2e-tone' && /uploaded e2e-tone\.wav/.test(d.log)
+      ? { pass: true, detail: `the upload decoded and listed as "${d.uploaded}" under My Sounds` }
+      : { pass: false, detail: `rows=${show(d.rows)} uploaded=${show(d.uploaded)}` })
+
 step(20, 'an invite shows a presence avatar and a ruler comment lands', `
 emit(click("#btn-invite"))
 time.sleep(0.3)
@@ -628,7 +656,7 @@ emit(probe("var b = window.VS.exportBuffer().bytes; var h = 0;"
 step(13, 'a note can be added and dragged in the roll', `
 emit(probe("document.querySelector('[data-modal=\\\"addtrack\\\"]').click(); return JSON.stringify({ok:true})"))
 time.sleep(0.5)
-probe("document.querySelectorAll('#track-types button')[1].click()")
+probe("([...document.querySelectorAll('#track-types button')].find((b) => /instrument/i.test(b.textContent)) || document.querySelectorAll('#track-types button')[1]).click()")
 time.sleep(0.7)
 emit(click("#tab-take"))
 time.sleep(0.4)
@@ -646,6 +674,8 @@ emit({**before, "added": mid.get("n"), "from": mid.get("note"), "to": after.get(
 step(12, 'playing drives the strip meters and mute cuts the strip', `
 emit(click("#btn-mixer"))
 time.sleep(0.6)
+probe("document.querySelectorAll('[data-track]')[0].click()")
+time.sleep(0.3)
 probe("document.querySelectorAll('.strip [data-mute][aria-pressed=\\\"true\\\"], .strip [data-solo][aria-pressed=\\\"true\\\"]').forEach(b=>b.click())")
 time.sleep(0.3)
 emit(click("#btn-play"))

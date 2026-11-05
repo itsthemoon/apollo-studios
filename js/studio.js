@@ -1595,7 +1595,15 @@ export function attach(app) {
     try {
       const ctx = new AudioContext()
       const now = ctx.currentTime + 0.05
-      if (sample.kind === 'loops' || sample.pattern?.includes('|')) {
+      if (sample.data) {
+        // an upload: decode-free, the buffer is already raw samples
+        const buffer = ctx.createBuffer(1, sample.data.length, sample.rate || state.sampleRate)
+        buffer.copyToChannel(sample.data, 0)
+        const src = ctx.createBufferSource()
+        src.buffer = buffer
+        src.connect(ctx.destination)
+        src.start(now)
+      } else if (sample.kind === 'loops' || sample.pattern?.includes('|')) {
         const pattern = drums.createPattern()
         library.parsePattern(sample.pattern).forEach((p) => { drums.toggleStep(pattern, p.lane, p.step) })
         drums.renderPattern(ctx, pattern, { bpm: sample.bpm, bars: 1, startAt: now })
@@ -1620,6 +1628,27 @@ export function attach(app) {
     renderSounds()
     previewSound(next)
   }
+  // upload: decode to raw samples and park it in My Sounds
+  $('file-sound').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    try {
+      const bytes = await file.arrayBuffer()
+      const ctx = new AudioContext({ sampleRate: state.sampleRate })
+      const decoded = await ctx.decodeAudioData(bytes)
+      const data = Float32Array.from(decoded.getChannelData(0))
+      await ctx.close()
+      const sample = library.addUserSample({ name: file.name, data, rate: decoded.sampleRate, bpm: bpmNow() })
+      soundCat = 'mine'
+      renderSounds()
+      state.sound = sample
+      app.log(`uploaded ${file.name} — ${(data.length / decoded.sampleRate).toFixed(1)}s, ${data.length} samples`)
+      app.status('uploaded')
+    } catch (err) {
+      app.log(`upload failed: ${err.message}`)
+    }
+  })
   $('btn-snd-like').addEventListener('click', () => {
     if (!state.sound) return
     state.favourites = library.favourite(state.favourites, state.sound.slug)
