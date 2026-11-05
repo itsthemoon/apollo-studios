@@ -378,7 +378,7 @@ export function install({ state, log }) {
   }
   function renderChat() {
     state.renderPresence?.()
-    const pins = (state.comments || []).map((c) => `<p class="chatpin"><b>${esc(c.who)}</b> <span class="hint">bar ${Math.floor(c.beat / 4) + 1}</span> ${esc(c.text)}</p>`).join('')
+    const pins = (state.comments || []).map((c) => `<p class="chatpin"><b>${esc(c.who)}</b> <span class="hint">bar ${Math.floor(c.beat / (state.studio?.barBeats?.() || 4)) + 1}</span> ${esc(c.text)}</p>`).join('')
     const talk = state.chat.map((c) => `<p><b>${esc(c.who)}</b> ${esc(c.text)}</p>`).join('')
     $('chat-log').innerHTML = pins + talk
     $('chat-log').scrollTop = $('chat-log').scrollHeight
@@ -535,9 +535,13 @@ export function install({ state, log }) {
     state.notes = []
     state.lyrics = []
     state.chat = [{ who: 'Apollo', text: 'Session chat — anyone you invite sees this thread.' }]
+    state.comments = []
     state.versions = []
     state.folders = []
     state.playhead = 0
+    state.loop = null
+    state.loopOn = false
+    $('btn-loop')?.setAttribute('aria-pressed', 'false')
     $('proj-name').value = 'untitled'
     $('in-lyrics').value = ''
     state.studio?.renderAll?.()
@@ -546,6 +550,7 @@ export function install({ state, log }) {
     renderFolders()
     renderVersions()
     renderChat()
+    state.paintComments?.()
     renderLyricList()
     persistLyrics()
     log('new project')

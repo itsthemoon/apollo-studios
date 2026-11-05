@@ -1814,6 +1814,7 @@ export function attach(app) {
     // the lane and the rows must span exactly the bars the ruler just built, or
     // pixel<->beat maths and every full-width clip disagree with the ruler
     laneSpan()
+    paintComments()
     return bars
   }
 
