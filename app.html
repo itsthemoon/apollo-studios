@@ -207,9 +207,15 @@
           </div>
           <p class="hint">Upgrade your <span aria-hidden="true">&#128081;</span> Membership</p>
         </div>
+      </div>
+      <div class="reg-cols">
         <div class="reg-wave">
           <div class="reg-ruler" id="reg-ruler" aria-hidden="true"></div>
           <div class="reg-canvas-wrap"><canvas id="reg-wave" width="900" height="150" role="img" aria-label="Region waveform"></canvas></div>
+        </div>
+        <div class="notes-side">
+          <div class="notes-head" aria-hidden="true"><span>Time</span><span>Note</span><span>Cents</span><span></span></div>
+          <div id="note-list" class="notes" role="list" aria-label="Detected notes"></div>
         </div>
       </div>
       <div class="reg-notes">
@@ -224,7 +230,6 @@
           </div>
         </div>
         <div class="roll-wrap"><canvas id="roll" width="1400" height="200" role="img" aria-label="Piano roll editor"></canvas></div>
-        <div id="note-list" class="notes" role="list" aria-label="Detected notes"></div>
       </div>
     </section>
 

@@ -803,16 +803,23 @@ function paintRegionWave() {
   if (!state.peakCache) state.peakCache = waves.buildCache(state.take, state.sampleRate)
   const cols = waves.columns(state.peakCache, 0, state.take.length, w)
   ctx2d.fillStyle = 'rgba(0,198,209,0.85)'
+  /* 4px inset top and bottom so a limited take never welds to the border */
   const mid = h / 2
+  const room = Math.max(1, mid - 9)
   for (let x = 0; x < cols.peak.length; x++) {
-    const amp = Math.max(1, cols.peak[x] * mid)
+    const amp = Math.max(1, cols.peak[x] * room)
     ctx2d.fillRect(x, mid - amp, 1, amp * 2)
   }
   // the reference ruler counts bars across the whole region, cropped audio or not
   const ruler = $('reg-ruler')
   const bpm = Number($('in-bpm')?.value) || 96
   const bars = Math.max(2, Math.round((state.take.length / state.sampleRate) * bpm / 240))
-  ruler.innerHTML = Array.from({ length: 10 }, (_, i) => `<span>${Math.max(1, Math.round(1 + i * (bars / 9)))}</span>`).join('')
+  /* one label per bar line, thinned so the row never crowds */
+  const every = Math.max(1, Math.ceil(bars / 14))
+  ruler.innerHTML = Array.from({ length: Math.floor((bars - 1) / every) + 1 }, (_, i) => {
+    const bar = 1 + i * every
+    return `<span style="left:${((bar - 1) / bars) * 100}%">${bar}</span>`
+  }).join('')
 }
 
 function setRegion(patch) {

@@ -288,7 +288,8 @@
 
 /* the take panel owns the dock height: the roll grows, the list and hint stay put */
 #p-take:not([hidden]) { display: flex; flex-direction: column; height: 100%; }
-#p-take .roll-wrap { flex: 1 1 auto; min-height: 96px; }
+#p-take .roll-wrap { flex: 0 1 auto; min-height: 96px; max-height: 152px; }
+#p-take .roll-wrap canvas { height: 100%; display: block; }
 #p-take #roll { height: 100%; }
 
 /* ------------------------------------------------------- transport additions */
@@ -551,9 +552,11 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .reg-row { display: flex; gap: 6px; }
 .reg-row .pill { display: inline-flex; align-items: center; gap: 5px; }
 .reg-wave { min-width: 0; }
-.reg-ruler { height: 16px; display: flex; gap: 24px; font-size: 9px; color: #6f6f80; border-bottom: 1px solid #23232b; }
-.reg-canvas-wrap { height: 132px; border-radius: 6px; background: #101015; overflow: hidden; }
-.reg-canvas-wrap canvas { width: 100%; height: 132px; display: block; }
+.reg-ruler { position: relative; height: 16px; font-size: 9px; color: #7c7c8e; border-bottom: 1px solid #23232b; }
+.reg-ruler span { position: absolute; top: 2px; transform: translateX(-0.5px); }
+.reg-cols { margin-bottom: 12px; }
+.reg-canvas-wrap { height: 118px; border-radius: 6px; background: #101015; border: 1px solid #23232b; overflow: hidden; }
+.reg-canvas-wrap canvas { width: 100%; height: 118px; display: block; }
 .reg-notes { margin-top: 10px; border-top: 1px solid #23232b; padding-top: 8px; }
 
 /* ---- transport key pill --------------------------------------------------- */
@@ -564,7 +567,8 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 /* the dock must leave room for its own tab bar */
 .tabbar { flex: 0 0 auto; }
 .dock { min-height: 0; }
-#p-harmony, #p-voice, #p-take { max-height: calc(100vh - 320px); overflow: auto; }
+/* the scroller is .ins-body; a viewport-based cap here left content below the fold */
+#p-harmony, #p-voice, #p-take { max-height: none; overflow: visible; }
 .strip .knobs, .strip .knob-row { flex: 0 0 auto; }
 
 /* every select wears the same skin, including the transport and inspector ones */
@@ -598,3 +602,9 @@ input[type="range"] { accent-color: var(--accent, #00c6d1); }
 .arm { width: 22px; height: 22px; border-radius: 5px; border: 1px solid #2f2f39; background: #1b1b22; display: grid; place-items: center; color: #b9b9c6; }
 .arm svg { width: 11px; height: 11px; }
 .arm[aria-pressed="true"] { color: var(--red-hot, #f2493b); border-color: #f2493b55; background: #f2493b1a; }
+
+/* the wave and the note list share a row, so the list never falls below the fold */
+.reg-cols { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
+.notes-side { display: flex; flex-direction: column; min-height: 0; max-height: 190px; }
+.notes-side .notes { flex: 1 1 auto; min-height: 0; max-height: none; }
+.notes-side .notes-head { padding-top: 2px; }

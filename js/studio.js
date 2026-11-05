@@ -783,16 +783,22 @@ export function attach(app) {
       $('note-count').textContent = state.notes.length ? `${state.notes.length} take notes` : 'no notes'
       g.fillStyle = '#0a0e10'
       g.fillRect(0, 0, W, H)
-      g.fillStyle = '#192124'
-      for (let b = 0; b <= 32; b += 4) g.fillRect(b * (W / 32), 0, 1, H)
+      /* the dividers are the timeline's bar lines: span comes from the take,
+         and a bar is as many beats as the meter says, not a fixed four */
       const beatsPerSecond = Number($('in-bpm').value) / 60
+      const perBar = Math.max(1, Number(($('in-timesig')?.value || '4/4').split('/')[0]) || 4)
+      const lastEnd = state.notes.reduce((m, n) => Math.max(m, n.start + n.dur), 0)
+      const totalBeats = Math.max(8, Math.ceil((lastEnd * beatsPerSecond + 1) / perBar) * perBar)
+      const beatX = (W - 26) / totalBeats
+      g.fillStyle = '#192124'
+      for (let b = 0; b <= totalBeats; b += perBar) g.fillRect(26 + b * beatX, 0, 1, H)
       const lowest = state.notes.length ? Math.min(...state.notes.map(n => Math.floor(n.midi))) : 48
       const low = Math.max(24, lowest - 2)
       state.notes.forEach((n) => {
         const row = 23 - (Math.round(n.midi) - low)
         if (row < 0 || row > 23) return
-        const x = (n.start * beatsPerSecond / 32) * (W - 26)
-        const w = Math.max(3, (n.dur * beatsPerSecond / 32) * W)
+        const x = n.start * beatsPerSecond * beatX
+        const w = Math.max(3, n.dur * beatsPerSecond * beatX)
         const flat = Math.abs(n.cents || 0) < 8
         g.fillStyle = flat ? '#3f8f99' : '#6fa8ff'
         g.fillRect(x + 26, row * (H / 24) + 2, w, Math.max(2, H / 24 - 4))
