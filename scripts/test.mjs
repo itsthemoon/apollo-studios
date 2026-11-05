@@ -154,6 +154,18 @@ test('stylesheets are CSS', () => {
   }
 })
 
+// Every registry action needs a handler with the same tail. ACTIONS is dotted-tail
+// matched at runtime, and an unhandled action is a silent dead key.
+test('every shortcut has a handler', async () => {
+  const { BINDINGS } = await import('../js/shortcuts.js')
+  const studio = readFileSync(new URL('../js/studio.js', import.meta.url), 'utf8')
+  const acts = studio.slice(studio.indexOf('const ACTIONS'), studio.indexOf("document.addEventListener('keydown'", studio.indexOf('const ACTIONS')))
+  const have = new Set([...acts.matchAll(/([A-Za-z_$][\w$]*)\s*:/g)].map(m => m[1]))
+  const dead = BINDINGS.map(b => b.action).filter(a => !have.has(a.split('.').pop()))
+  ok(BINDINGS.length > 30, `${BINDINGS.length} bindings registered`)
+  ok(dead.length === 0, `no dead keys${dead.length ? `: ${dead.join(', ')}` : ''}`)
+})
+
 test('dom wiring', () => {
   const app = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8')
   const html = readFileSync(new URL('../app.html', import.meta.url), 'utf8')

@@ -68,6 +68,14 @@ def click(sel, SID=SID):
     cdp("Input.dispatchMouseEvent", session_id=SID, type="mouseReleased", x=v["x"], y=v["y"], button="left", buttons=0, clickCount=1)
     return v
 
+def key(name, mods=0, SID=SID):
+    """A real key press: dispatched by the browser, so the app's own handler runs."""
+    code = name.upper() if len(name) == 1 else name
+    cdp("Input.dispatchKeyEvent", session_id=SID, type="keyDown", key=name, modifiers=mods,
+        windowsVirtualKeyCode=(ord(code) if len(name) == 1 else 0))
+    cdp("Input.dispatchKeyEvent", session_id=SID, type="keyUp", key=name, modifiers=mods)
+    time.sleep(0.25)
+
 def setval(sel, val, evt):
     return probe("var e=document.querySelector(" + json.dumps(sel) + ");"
                  " if(!e) return JSON.stringify({missing:true});"
@@ -472,6 +480,24 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(11, 'select all, copy, paste, delete and undo work from the keys', `
+probe("document.body.focus()")
+base = probe("return JSON.stringify({clips:document.querySelectorAll('#lane .clip').length})")
+key("a", 4)
+sel = probe("return JSON.stringify({sel:document.querySelectorAll('#lane .clip.sel').length})")
+key("c", 4)
+key("v", 4)
+pasted = probe("return JSON.stringify({clips:document.querySelectorAll('#lane .clip').length})")
+key("Delete")
+gone = probe("return JSON.stringify({clips:document.querySelectorAll('#lane .clip').length})")
+key("z", 4)
+back = probe("return JSON.stringify({clips:document.querySelectorAll('#lane .clip').length,"
+             " log:(document.getElementById('log')||{}).textContent||''})")
+emit({**base, **sel, "pasted": pasted["clips"], "gone": gone["clips"], "back": back["clips"]})
+`, d => d.sel > 0 && d.pasted === d.clips * 2 && d.gone === d.clips && d.back === d.pasted
+      ? { pass: true, detail: `${d.sel} selected, ${d.clips} → ${d.pasted} pasted → ${d.gone} deleted → ${d.back} undone` }
+      : { pass: false, detail: `sel=${d.sel} clips=${d.clips} pasted=${d.pasted} gone=${d.gone} back=${d.back}` })
+
 step(10, 'every panel and menu opens without throwing', `
 # one free-global mistake (an unimported openPanel) only showed up on a click
 emit(probe("window.__hit = []; window.addEventListener('error', e => window.__hit.push(String(e.message)));"

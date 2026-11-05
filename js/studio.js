@@ -2422,12 +2422,26 @@ export function attach(app) {
     quantize: () => $('btn-quantize').click(), split: () => $('btn-split-region').click(),
     stretch: () => $('btn-stretch').click(), zoomIn: () => $('btn-zoom-in').click(),
     zoomOut: () => $('btn-zoom-out').click(), projectSettings: () => openModal('settings'),
+    // the registry keys are dotted and these are the tails; the last segment is
+    // the contract, so a new binding only needs a matching entry here
+    cut: () => state.timeline?.cut(), copy: () => state.timeline?.copy(),
+    paste: () => state.timeline?.paste(), duplicate: () => state.timeline?.duplicate(),
+    delete: () => state.timeline?.delete(), deleteBack: () => state.timeline?.delete(),
+    selectAll: () => state.timeline?.selectAll(), join: () => state.timeline?.join(),
+    fit: () => state.timeline?.fit(), close: () => app.openPanel('take'),
+    countIn: () => $('menu-metro').querySelector('[data-metro="count"]').click(),
+    punch: () => $('btn-punch') ? $('btn-punch').click() : $('btn-loop').click(),
+    playStop: () => ($('btn-play').disabled ? null : $('btn-play').click()),
+    toStart: () => $('btn-stop').click(),
+    openEditor: () => app.openPanel('take'), toggleAutomation: () => toggleAutomation(),
+    history: () => app.openPanel('versions'), newTrack: () => openModal('addtrack'),
+    open: () => app.openPanel('take'), export: () => $('btn-export').click(),
   }
   document.addEventListener('keydown', (e) => {
     if (shortcuts.isTypingTarget(e.target)) return
     const binding = shortcuts.find(e)
     if (!binding) return
-    const fn = ACTIONS[binding.action]
+    const fn = ACTIONS[binding.action.split('.').pop()] || ACTIONS[binding.action]
     if (!fn) return
     e.preventDefault()
     fn()

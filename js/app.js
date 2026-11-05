@@ -1417,7 +1417,7 @@ function boot() {
   window.__app = app // probe hook: tests read the model through this
   state.studio = attachStudio(app)
   installPanels({ state, log })
-  installTimeline({ state, log })
+  state.timeline = installTimeline({ state, log })
   installEdit({ state, log })
   installPersist({ state, log })
   state.studio?.input?.syncArmed?.()

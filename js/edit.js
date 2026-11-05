@@ -214,7 +214,9 @@ export function install({ state, log } = {}) {
       notes: state.notes.map((n) => ({ ...n })),
       sel: [...ui.sel],
       primary: ui.primary,
-      rolls: new Map([...state.rolls].map(([id, r]) => [id, roll.cloneRoll(r)])),
+      // an entry can be present before its roll object is (instrument add in
+      // flight), so a bare clone of the map is not safe
+      rolls: new Map([...state.rolls].filter(([, r]) => r).map(([id, r]) => [id, roll.cloneRoll(r)])),
       mixer: mixerRows(),
     }
   }

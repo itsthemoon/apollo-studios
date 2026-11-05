@@ -550,6 +550,108 @@ export function install({ state, log }) {
     setSelection([...ui.sel].filter((key) => regionOf(key)))
   }
 
+
+  // ------------------------------------------------ selection commands
+  // The shortcut registry speaks these; each one works on the same selection a
+  // marquee or a shift-click builds, so the keyboard and the mouse agree.
+  let board = []
+
+  function selectedRegions() {
+    return [...ui.sel].map(regionOf).filter(Boolean)
+  }
+
+  function copySelection() {
+    const entries = selectedRegions()
+    if (!entries.length) return 0
+    const base = Math.min(...entries.map((e) => e.region.startBeat))
+    board = entries.map((e) => ({ trackId: e.track.id, clip: { ...e.region, startBeat: round2(e.region.startBeat - base) } }))
+    log(`copied ${board.length} region${board.length === 1 ? '' : 's'}`)
+    return board.length
+  }
+
+  function cutSelection() {
+    const n = copySelection()
+    if (!n) return 0
+    deleteSelection()
+    return n
+  }
+
+  function pasteRegions() {
+    if (!board.length) return 0
+    pushClipUndo()
+    const at = playheadBeats()
+    const made = []
+    for (const item of board) {
+      const track = trackOf(item.trackId)
+      if (!track) continue
+      const clip = { ...item.clip, startBeat: round2(at + item.clip.startBeat) }
+      listOf(track).push(clip)
+      mark(track)
+      made.push(selKey(track.id, listOf(track).length - 1))
+    }
+    syncLanes()
+    setSelection(made)
+    log(`pasted ${made.length} region${made.length === 1 ? '' : 's'} at ${at.toFixed(2)} beats`)
+    return made.length
+  }
+
+  function duplicateSelection() {
+    const entries = selectedRegions()
+    if (!entries.length) return 0
+    pushClipUndo()
+    const made = []
+    for (const entry of [...entries].sort((a, b) => b.index - a.index)) {
+      const copy = duplicateRegion(entry.track, entry.index)
+      if (copy) made.push(selKey(entry.track.id, listOf(entry.track).length - 1))
+    }
+    syncLanes()
+    log(`duplicated ${made.length} region${made.length === 1 ? '' : 's'}`)
+    if (made.length) setSelection(made)
+    return made.length
+  }
+
+  function selectAllRegions() {
+    const keys = []
+    document.querySelectorAll('#lane .clip[data-clip]').forEach((node) => {
+      if (!node.getBoundingClientRect().width) return
+      keys.push(selKey(node.dataset.clip, Number(node.dataset.regionIndex || 0)))
+    })
+    setSelection(keys)
+    log(`selected ${keys.length} region${keys.length === 1 ? '' : 's'}`)
+    return keys.length
+  }
+
+  function joinSelection() {
+    const entries = selectedRegions()
+    if (entries.length < 2) return 0
+    const track = entries[0].track
+    if (entries.some((e) => e.track !== track)) { log('join needs regions on one track'); return 0 }
+    pushClipUndo()
+    const start = Math.min(...entries.map((e) => e.region.startBeat))
+    const end = Math.max(...entries.map((e) => e.region.startBeat + e.region.lengthBeats))
+    const first = entries.reduce((a, b) => (a.region.startBeat <= b.region.startBeat ? a : b))
+    const joined = { ...first.region, startBeat: start, lengthBeats: round2(end - start) }
+    const keep = first.index
+    entries.map((e) => e.index).sort((a, b) => b - a).forEach((index) => dropRegion(track, index))
+    listOf(track).push(joined)
+    mark(track)
+    syncLanes()
+    const key = selKey(track.id, listOf(track).length - 1)
+    setSelection([key])
+    log(`joined ${entries.length} regions over ${(end - start).toFixed(2)} beats`)
+    void keep
+    return entries.length
+  }
+
+  function fitZoom() {
+    const all = document.querySelectorAll('#lane .clip[data-clip]')
+    if (!all.length) return 0
+    let far = 0
+    for (const node of all) far = Math.max(far, Number(node.dataset.endBeat || 0))
+    for (let i = 0; i < 24 && far * pxPerBeat() > lane.clientWidth - 40; i++) $('btn-zoom-out').click()
+    return all.length
+  }
+
   function deleteSelection() {
     const entries = [...ui.sel].map(regionOf).filter(Boolean)
     if (!entries.length) return 0
@@ -1229,4 +1331,11 @@ export function install({ state, log }) {
   if (host) new MutationObserver(() => syncLanes()).observe(host, { childList: true })
   const row1 = document.querySelector('.lane-row[data-row]')
   if (row1) new MutationObserver(() => syncLanes()).observe(row1, { childList: true })
+
+  return {
+    cut: cutSelection, copy: copySelection, paste: pasteRegions,
+    duplicate: duplicateSelection, selectAll: selectAllRegions,
+    delete: deleteSelection, join: joinSelection, fit: fitZoom,
+    selection: selectedRegions,
+  }
 }
