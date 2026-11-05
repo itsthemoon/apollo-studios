@@ -472,6 +472,21 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(10, 'every panel and menu opens without throwing', `
+# one free-global mistake (an unimported openPanel) only showed up on a click
+emit(probe("window.__hit = []; window.addEventListener('error', e => window.__hit.push(String(e.message)));"
+           " document.querySelectorAll('[data-panel-open]').forEach(b => b.click());"
+           " document.querySelectorAll('.tab').forEach(b => b.click());"
+           " document.querySelectorAll('[data-menu]').forEach(b => b.click());"
+           " return JSON.stringify({hit: window.__hit.slice(0, 3),"
+           " open: document.querySelectorAll('.panel:not([hidden]), .menu:not([hidden])').length})"))
+emit(probe("document.querySelectorAll('[data-panel-open]').forEach(b => b.click());"
+           " document.querySelectorAll('[data-menu]').forEach(b => b.click());"
+           " return JSON.stringify({hit: window.__hit.slice(0, 3)})"))
+`, d => d && d.hit.length === 0
+      ? { pass: true, detail: `opened every panel opener, tab and menu with no exception, ${d.open} surface live` }
+      : { pass: false, detail: `exceptions ${show(d.hit)}` })
+
   } finally {
     closeTab()
     if (startedServer) startedServer.kill()

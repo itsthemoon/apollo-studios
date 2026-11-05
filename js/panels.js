@@ -21,7 +21,7 @@ const pad2 = (n) => String(n).padStart(2, '0')
 const mmss = (seconds) => `${Math.floor(seconds / 60)}:${pad2(Math.round(seconds % 60))}`
 const slugify = (s) => String(s || 'untitled').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'untitled'
 
-function openPanel(name) {
+export function openPanel(name) {
   const btn = document.querySelector(`[data-panel-open="p-${name}"]`) ||
     document.querySelector(`.tab[data-drawer="${name}"]`)
   btn?.click()
