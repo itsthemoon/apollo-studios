@@ -304,6 +304,7 @@ body.counting .rec-dot { animation: none; }
 .zoomsel { display: inline-flex; align-items: center; }
 .zoomsel input { width: 66px; height: 22px; accent-color: var(--cyan); }
 .ruler-tools .zoomsel { padding: 0 2px; }
+.ruler-tools { padding: 0 8px; background: #101214ee; border-radius: 6px 0 0 6px; box-shadow: -18px 0 14px #101214; }
 
 .menu-range { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 12px; color: var(--ink); }
 .menu-range input { flex: 1; accent-color: var(--cyan); }
@@ -463,7 +464,10 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .ap-cell { min-width: 0; }
 .ap-dd { position: relative; margin-bottom: 8px; }
 .ap-label { display: block; font-size: 11px; color: #8b8b98; margin-bottom: 4px; }
-.select .chev { border-top-color: #9a9aa8; }
+.select .chev {
+  width: 9px; height: 9px; border: 0; border-right: 1.4px solid #9a9aa8; border-bottom: 1.4px solid #9a9aa8;
+  transform: rotate(45deg) translateY(-2px); border-radius: 0;
+}
 .select[aria-expanded='true'] .chev { transform: rotate(180deg); }
 .select { width: 100%; height: 30px; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 9px; border-radius: 6px; border: 1px solid #2c2c35; background: #17171c; color: #e6e6ee; font-size: 12px; cursor: pointer; }
 .select .chev { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid #9a9aa8; }
@@ -553,9 +557,9 @@ body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px
 .reg-notes { margin-top: 10px; border-top: 1px solid #23232b; padding-top: 8px; }
 
 /* ---- transport key pill --------------------------------------------------- */
-.keypill { display: inline-flex; align-items: center; gap: 2px; height: 24px; padding: 0 6px; border-radius: 6px; background: #17171c; border: 1px solid #2c2c35; font-size: 11px; }
-.keypill select { appearance: none; background-color: transparent; background-image: none; border: 0; color: #e6e6ee; font-size: 11px; padding: 0 10px 0 1px; }
-.keypill select + select { color: #9a9aa8; }
+.keypill { display: inline-flex; align-items: center; gap: 0; height: 24px; padding: 0 7px; border-radius: 6px; background: #17171c; border: 1px solid #2c2c35; font-size: 11px; width: max-content; }
+.keypill select { appearance: none; background-color: transparent; background-image: none; border: 0; color: #e6e6ee; font-size: 11px; padding: 0; min-width: 0; width: auto; text-align: left; }
+.keypill select + select { color: #9a9aa8; margin-left: 1px; }
 
 /* the dock must leave room for its own tab bar */
 .tabbar { flex: 0 0 auto; }
@@ -586,4 +590,11 @@ input[type="range"] { accent-color: var(--accent, #00c6d1); }
 .ins-right .knob i { color: #a6a6b4; }
 
 /* the key pill reads as one label, so neither half carries a caret */
-#in-root, #in-mode { background-image: none; padding-right: 8px; }
+#in-root { background-image: none; padding: 0; width: 10px; }
+#in-mode { background-image: none; padding: 0; width: 26px; }
+.keypill { gap: 3px; padding: 0 8px; }
+.keypill select + select { margin-left: -2px; }
+
+.arm { width: 22px; height: 22px; border-radius: 5px; border: 1px solid #2f2f39; background: #1b1b22; display: grid; place-items: center; color: #b9b9c6; }
+.arm svg { width: 11px; height: 11px; }
+.arm[aria-pressed="true"] { color: var(--red-hot, #f2493b); border-color: #f2493b55; background: #f2493b1a; }

@@ -1255,7 +1255,7 @@ function boot() {
   // the project key is a root plus major or minor, as the product shows it
   // major/minor are the product's two keys; chromatic stays for the factory
   // patches that do not constrain to a key at all
-  $('in-mode').innerHTML = [['major', 'maj'], ['minor', 'min'], ['chromatic', 'chromatic']]
+  $('in-mode').innerHTML = [['major', 'maj'], ['minor', 'min'], ['chromatic', 'chrom']]
     .map(([v, label]) => `<option value="${v}"${v === 'minor' ? ' selected' : ''}>${label}</option>`).join('')
   $('in-harmony').innerHTML = harmony.HARMONY_PRESETS.map(p => `<option value="${p.name}">${p.name}</option>`).join('')
   $('in-character').innerHTML = voicechar.CHARACTERS.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
