@@ -197,6 +197,8 @@ export function install({ state, log }) {
       const on = $('btn-ab').getAttribute('aria-pressed') !== 'true'
       if (Boolean(state.masterState.bypass) !== on) state.masterState = mastering2.toggleBypass(state.masterState)
       paintMaster()
+      // A/B is meant to be heard while the take plays, so re-cut the chain now
+      if (state.playing?.length) document.getElementById('in-gain')?.dispatchEvent(new Event('input'))
     })
     $('btn-analyze').addEventListener('click', analyseMaster)
     $('btn-apply-master').addEventListener('click', applyMaster)
@@ -492,7 +494,13 @@ export function install({ state, log }) {
   })
 
   // ------------------------------------------------------------- create
+  // the menu is rebuilt here, so these are the bindings of record — the old
+  // static markup and the listeners booted onto it were being thrown away
   $('menu-create').innerHTML = `
+    <button role="menuitem" type="button" data-create="track"><span data-icon="plus" aria-hidden="true"></span>New track</button>
+    <button role="menuitem" type="button" data-create="sounds"><span data-icon="sounds" aria-hidden="true"></span>Browse sounds</button>
+    <button role="menuitem" type="button" data-create="demo"><span data-icon="wave" aria-hidden="true"></span>Load the demo take</button>
+    <button role="menuitem" type="button" data-create="beat"><span data-icon="drum" aria-hidden="true"></span>Generate a beat</button>
     <button role="menuitem" type="button" data-create="project">New project</button>
     <button role="menuitem" type="button" data-create="folder">New folder</button>
     <button role="menuitem" type="button" data-create="duplicate">Duplicate project</button>`
@@ -540,6 +548,10 @@ export function install({ state, log }) {
   $('menu-create').addEventListener('click', (e) => {
     const b = e.target.closest('[data-create]')
     if (!b) return
+    if (b.dataset.create === 'track') { openModal('addtrack'); return }
+    if (b.dataset.create === 'sounds') { openPanel('sounds'); return }
+    if (b.dataset.create === 'demo') { document.getElementById('btn-demo').click(); return }
+    if (b.dataset.create === 'beat') { openPanel('take'); log('beat generator is in AutoMix & Tools'); return }
     if (b.dataset.create === 'project') newProject()
     if (b.dataset.create === 'folder') newFolder()
     if (b.dataset.create === 'duplicate') duplicateProject()

@@ -30,6 +30,7 @@
       <button class="ic inline" type="button" aria-label="Redo" id="btn-redo"><span data-icon="redo" aria-hidden="true"></span></button>
       <button class="ic inline" type="button" aria-label="Musical typing" id="btn-keys"><span data-icon="keys" aria-hidden="true"></span></button>
       <button class="ic inline" type="button" aria-label="Metronome" id="btn-metro"><span data-icon="metronome" aria-hidden="true"></span></button>
+      <button class="ic inline" type="button" aria-label="Loop playback" aria-pressed="false" id="btn-loop"><span data-icon="loop" aria-hidden="true"></span></button>
       <button class="ic inline chev" type="button" aria-label="Metronome settings" data-menu="metro"><span data-icon="chevron-down" aria-hidden="true"></span></button>
       <label class="bpm"><input id="in-bpm" type="number" min="40" max="220" value="96" step="1" aria-label="Tempo"><span>bpm</span></label>
       <span class="ts">4/4</span>
@@ -357,7 +358,6 @@
 
     <section class="panel" id="p-master" role="tabpanel" aria-labelledby="tab-master" hidden>
       <div class="panel-head"><h2>Mastering</h2>
-        <button id="btn-master-ab" class="pill ghost" type="button" aria-pressed="false" title="Bypass the mastering chain (A/B)">A/B</button>
         <button id="btn-analyze" class="pill" type="button">Analyze</button>
         <label class="file ghost" role="button" tabindex="0">Reference<input id="file-reference" type="file" accept="audio/*" hidden aria-label="Import a reference track"></label>
         <button id="btn-apply-master" class="pill primary" type="button">Apply</button></div>
@@ -492,6 +492,14 @@
     <textarea id="in-invite-msg" class="lyrics" placeholder="Please use at least 50 characters." aria-label="Invite message"></textarea>
     <div class="row"><span class="hint">Invite Others — anyone with this link can edit this project</span></div>
     <div class="row"><button class="pill ghost" type="button" id="btn-copy-link">Copy Link</button></div>
+  </div>
+</div>
+
+<div class="modal" id="m-export" role="dialog" aria-modal="true" aria-label="Export audio" hidden>
+  <div class="sheet"><div class="sheet-head"><h2>Export audio</h2><button class="ic" type="button" data-close aria-label="Close"><span data-icon="close" aria-hidden="true"></span></button></div>
+    <p class="hint">48 kHz · 16-bit · stereo WAV of the whole take, mastering and region edits baked in.</p>
+    <div class="row"><button class="pill primary" type="button" id="btn-export-confirm">Export WAV</button>
+      <button class="pill ghost" type="button" data-close>Cancel</button></div>
   </div>
 </div>
 

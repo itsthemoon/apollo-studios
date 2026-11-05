@@ -2257,7 +2257,7 @@ export function attach(app) {
 
   // ---------------------------------------------------------------- loop play
   function loopBeats() {
-    if (!state.loop) return null
+    if (!state.loop || !state.loopOn) return null
     const from = Math.max(0, beatsOf(Math.min(state.loop.from, state.loop.to)))
     const to = Math.max(0, beatsOf(Math.max(state.loop.from, state.loop.to)))
     return to - from < 0.06 ? null : { from, to }
@@ -2467,7 +2467,7 @@ export function attach(app) {
     selectAll: () => state.timeline?.selectAll(), join: () => state.timeline?.join(),
     fit: () => state.timeline?.fit(), close: () => app.openPanel('take'),
     countIn: () => $('menu-metro').querySelector('[data-metro="count"]').click(),
-    punch: () => $('btn-punch') ? $('btn-punch').click() : $('btn-loop').click(),
+    punch: () => $('btn-loop').click(),
     playStop: () => ($('btn-play').disabled ? null : $('btn-play').click()),
     toStart: () => $('btn-stop').click(),
     openEditor: () => app.openPanel('take'), toggleAutomation: () => toggleAutomation(),
@@ -2518,7 +2518,6 @@ export function attach(app) {
   $('btn-get-decoy').addEventListener('click', () => { $('in-member').checked = true; state.member = true; closeModal($('m-get')); app.log('pro enabled') })
   $('btn-menu-new').addEventListener('click', () => { state.notes = []; app.renderNotes(); app.log('new project') })
   $('btn-menu-export-project').addEventListener('click', () => $('btn-save').click())
-  $('btn-create-beat').addEventListener('click', () => { app.openPanel('take'); app.log('beat generator is in AutoMix & Tools') })
 
   // ---------------------------------------------------------------- paint
   function escapeHtml(s) {

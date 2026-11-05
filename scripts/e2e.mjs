@@ -396,6 +396,8 @@ time.sleep(0.25)
 emit(click("#btn-export-tab"))
 time.sleep(0.3)
 emit(click("#btn-export"))
+time.sleep(0.4)
+emit(click("#btn-export-confirm"))
 time.sleep(8)
 emit(probe("return JSON.stringify({status:(document.getElementById('status')||{}).textContent||null,"
            " log:(document.getElementById('log')||{}).textContent||'',"
@@ -490,6 +492,55 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(17, 'the Create menu still carries every item and a ruler loop arms', `
+probe("document.querySelector('#menu-create [data-create=sounds]').click()")
+time.sleep(0.4)
+emit(probe("return JSON.stringify({items: [...document.querySelectorAll('#menu-create [data-create]')].map(x => x.dataset.create)})"))
+box = probe("var b = document.getElementById('ruler').getBoundingClientRect();"
+            " return JSON.stringify({x: Math.round(b.x + b.width * 0.3), y: Math.round(b.y + b.height / 2)})")
+roll_drag(box["x"], box["y"], 160, 0)
+emit(probe("var b = document.getElementById('btn-loop'); b.click();"
+           " return JSON.stringify({region: Boolean(window.VS.state.loop),"
+           " sounds: !document.getElementById('p-sounds').hidden, loop: b.getAttribute('aria-pressed'),"
+           " items: [...document.querySelectorAll('#menu-create [data-create]')].map(x => x.dataset.create)})"))
+`, d => d.region === true && d.sounds === true && d.loop === 'true' && d.items?.length >= 6
+      && d.items.includes('demo') && d.items.includes('sounds')
+      ? { pass: true, detail: `ruler drag made a loop region and the button armed it; ${d.items.length} create items intact` }
+      : { pass: false, detail: `region=${show(d.region)} soundsHidden=${show(d.sounds)} loop=${show(d.loop)} items=${show(d.items?.length)}` })
+
+step(16, 'the input panel switches to Monitoring and the monitor arms', `
+emit(click("#tab-voice"))
+time.sleep(0.3)
+emit(probe("var t = document.querySelectorAll('.ins-sub')[1]; if (t) t.click();"
+           " return JSON.stringify({subs: document.querySelectorAll('.ins-sub').length, "
+           "mon: document.querySelector('[data-pane=monitor]')?.hidden, lvl: document.querySelector('[data-pane=level]')?.hidden})"))
+cdp("Browser.grantPermissions", origin="http://127.0.0.1:4173", permissions=["audioCapture"])
+probe("document.getElementById('btn-monitor').click()")
+time.sleep(1.2)
+emit(probe("return JSON.stringify({subs: document.querySelectorAll('.ins-sub').length,"
+           " mon: document.querySelector('[data-pane=monitor]')?.hidden, lvl: document.querySelector('[data-pane=level]')?.hidden,"
+           " pressed: document.getElementById('btn-monitor').getAttribute('aria-pressed'),"
+           " denial: document.getElementById('ins-denial').hidden, label: document.getElementById('btn-monitor').textContent})"))
+`, d => d.subs >= 2 && d.mon === false && d.lvl === true && d.pressed === 'true' && d.denial === true
+      ? { pass: true, detail: `${d.subs} subtabs, monitoring pane opens and the monitor arms ("${d.label}") with no denial note` }
+      : { pass: false, detail: `subs=${show(d.subs)} monHidden=${show(d.mon)} pressed=${show(d.pressed)} denialHidden=${show(d.denial)}` })
+
+step(15, 'the mastering A/B bypasses the chain in the export', `
+emit(click("#tab-master"))
+time.sleep(0.3)
+emit(probe("var b = document.querySelector('#master-presets button'); if (b) b.click(); return JSON.stringify({preset: b ? b.dataset.mpreset : null})"))
+time.sleep(0.4)
+probe("var b = window.VS.exportBuffer().bytes; var h = 0;"
+      " for (var i = 0; i < b.length; i += 97) h = (h * 31 + b[i]) % 2147483647; window.__a = h")
+probe("document.getElementById('btn-ab').click()")
+time.sleep(0.5)
+emit(probe("var b = window.VS.exportBuffer().bytes; var h = 0;"
+           " for (var i = 0; i < b.length; i += 97) h = (h * 31 + b[i]) % 2147483647;"
+           " return JSON.stringify({bypassed: h, mastered: window.__a, pressed: document.getElementById('btn-ab').getAttribute('aria-pressed'), label: document.getElementById('btn-ab').textContent})"))
+`, d => d.pressed === 'true' && d.bypassed && d.mastered && d.bypassed !== d.mastered
+      ? { pass: true, detail: `bypass switched the chain off (${d.label}); render ${d.mastered} mastered vs ${d.bypassed} bypassed` }
+      : { pass: false, detail: `pressed=${show(d.pressed)} mastered=${show(d.mastered)} bypassed=${show(d.bypassed)}` })
+
 step(14, 'region pitch and reverse change the exported bytes', `
 probe("document.getElementById('tab-take').click()")
 time.sleep(0.3)

@@ -11,6 +11,7 @@ import * as stems from './stems.js'
 import * as beat from './beat.js'
 import * as compose from './compose.js'
 import * as automix from './automix.js'
+import * as mastering2 from './mastering2.js'
 import * as tracks from './tracks.js'
 import { masterChain } from './master.js'
 import { encodeWav } from './wav.js'
@@ -37,6 +38,7 @@ const state = {
   rec: null,
   playing: [],
   live: [],
+  loopOn: false,
   region: { pitch: 0, rate: 1, gainDb: 0, reverse: false },
   peakCache: null,
   ctx: null,
@@ -100,10 +102,11 @@ function download(blob, name) {
 
 // ---- master settings from the panel ---------------------------------------
 function settings() {
-  // Bypass is A/B: everything downstream reads the same object, so an empty
-  // chain is what "before" sounds like.
-  if (state.masterBypass) {
-    return { eq: [], comp: { thresholdDb: 0, ratio: 1, attackMs: 8, releaseMs: 140, makeupDb: 0 }, limitDb: 0, inputDb: 0 }
+  // The mastering A/B is the chain's own bypass. The limiter still sits last —
+  // at a 0 dB ceiling it only clamps — but the EQ and the compressor let go, so
+  // "B" is the dry take rather than a different master.
+  if (mastering2.isBypassed(state.masterState)) {
+    return { eq: [], comp: { thresholdDb: 0, ratio: 1, attackMs: 8, releaseMs: 140, makeupDb: 0 }, limitDb: 0 }
   }
   return {
     eq: state.bands.map(b => ({ ...b })),
@@ -883,7 +886,11 @@ async function playNotes(notes, opts = {}) {
   $('btn-stop').disabled = false
   status('playing')
   const last = Math.max(...notes.map(n => n.start + n.dur))
-  setTimeout(() => { if (state.ctx === ctx) stopPlayback() }, (last + spread * notes.length + 0.4) * 1000)
+  setTimeout(() => {
+    if (state.ctx !== ctx) return
+    if (state.loop) { stopPlayback(); play(); return }
+    stopPlayback()
+  }, (last + spread * notes.length + 0.4) * 1000)
 }
 
 function play() { playNotes(state.notes) }
@@ -903,7 +910,11 @@ function playBuffer(buf) {
   src.connect(gain)
   src.start()
   state.playing.push(src)
-  src.onended = () => { if (state.ctx === ctx) stopPlayback() }
+  src.onended = () => {
+    if (state.ctx !== ctx) return
+    if (state.loop) { stopPlayback(); playTake(); return }
+    stopPlayback()
+  }
 }
 
 // ---- harmony ---------------------------------------------------------------
@@ -1294,7 +1305,6 @@ function boot() {
   $('in-character').innerHTML = voicechar.CHARACTERS.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
   $('in-genre').innerHTML = beat.GENRES.map(g => `<option value="${g.name}">${g.name}</option>`).join('')
   $('in-instrument').innerHTML = automix.INSTRUMENTS.map(i => `<option value="${i.name}">${i.name}</option>`).join('')
-  state.masterBypass = false
   state.bands = [
     { kind: 'highpass', freq: 30, q: 0.71, gainDb: 0 },
     { kind: 'lowshelf', freq: 90, q: 0.71, gainDb: 0 },
@@ -1321,18 +1331,21 @@ function boot() {
   $('btn-reg-close').addEventListener('click', () => openPanel('harmony'))
   $('btn-play').addEventListener('click', guard(play))
   $('btn-stop').addEventListener('click', stopPlayback)
-  $('btn-analyze').addEventListener('click', guard(readMeter))
-  $('btn-master-ab').addEventListener('click', () => {
-    state.masterBypass = !state.masterBypass
-    $('btn-master-ab').setAttribute('aria-pressed', String(state.masterBypass))
-    $('btn-master-ab').classList.toggle('on', state.masterBypass)
-    $('preset-state').textContent = state.masterBypass ? 'bypassed — hearing the dry take' : 'factory patches'
-    if (state.playing.length) play()
+  $('btn-loop').addEventListener('click', () => {
+    // state.loop is the drawn region; loopOn is whether the transport honours it
+    if (!state.loop) { log('drag across the ruler to set a loop first'); return }
+    state.loopOn = !state.loopOn
+    $('btn-loop').setAttribute('aria-pressed', String(state.loopOn))
+    $('btn-loop').classList.toggle('on', state.loopOn)
+    log(`loop ${state.loopOn ? 'on' : 'off'}`)
   })
-  $('btn-export').addEventListener('click', guard(exportWav))
+  $('btn-analyze').addEventListener('click', guard(readMeter))
+  $('btn-export').addEventListener('click', () => {
+    const m = $('m-export')
+    if (m) m.hidden = false
+  })
   // #btn-save is owned by js/persist.js (local slot + Last Saved stamp)
   $('btn-demo').addEventListener('click', guard(loadDemo))
-  $('btn-menu-demo').addEventListener('click', guard(loadDemo))
   $('btn-harmony').addEventListener('click', guard(buildHarmonies))
   $('btn-character').addEventListener('click', guard(applyCharacter))
   $('btn-split').addEventListener('click', guard(split))
