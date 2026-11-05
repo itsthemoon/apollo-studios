@@ -374,9 +374,9 @@ body.rail-collapsed .rail { width: 44px; flex: 0 0 44px; overflow-x: hidden; }
 body.rail-collapsed .rail-head { flex-direction: column; height: auto; flex: 0 0 auto; gap: 3px; padding: 6px 0; }
 body.rail-collapsed .addtrack { width: 28px; height: 28px; padding: 0; justify-content: center; font-size: 0; }
 body.rail-collapsed .rail-head .ic { width: 28px; height: 28px; }
-body.rail-collapsed .track-head { flex: 0 0 auto; height: auto; margin-bottom: 26px; }
+body.rail-collapsed .track-head { flex: 0 0 var(--row-h); height: var(--row-h); margin-bottom: 0; }
 body.rail-collapsed .th-inner { padding: 3px 0; align-items: center; }
-body.rail-collapsed .th-row { flex-direction: column; align-items: center; justify-content: center; height: auto; gap: 2px; padding: 1px 0; }
+body.rail-collapsed .th-row { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: center; height: auto; gap: 2px; padding: 1px 0; }
 body.rail-collapsed .th-row b { display: none; }
 body.rail-collapsed .tname,
 body.rail-collapsed .tnum,
@@ -447,7 +447,19 @@ body.rail-collapsed .th-spacer { display: none; }
 body.rail-collapsed .fx { font-size: 0; padding: 2px 4px; }
 body.rail-collapsed .fx::before { content: '+fx'; font-size: 8.5px; letter-spacing: 0.02em; }
 body.rail-collapsed .rail-row span:not([data-icon]) { display: none; }
-body.rail-collapsed .track-head { height: 112px; }
+/* both columns read --row-h, so the collapsed height has to be the variable and
+   the rail head has to stay one ruler tall or the heads drift off their lanes */
+body.rail-collapsed { --row-h: 112px; }
+body.rail-collapsed .track-head { height: var(--row-h); }
+body.rail-collapsed .rail-head { height: 40px; flex: 0 0 40px; flex-wrap: nowrap; overflow: hidden; gap: 2px; padding: 0 2px; }
+body.rail-collapsed .addtrack { width: 26px; padding: 0; justify-content: center; font-size: 0; }
+body.rail-collapsed .addtrack span { font-size: 12px; }
+body.rail-collapsed #btn-automation,
+body.rail-collapsed #btn-automation-arm { display: none; }
+body.rail-collapsed .track-head .fx,
+body.rail-collapsed .track-head .tname { display: none; }
+body.rail-collapsed .th-inner { padding: 6px 2px; align-content: center; }
+body.rail-collapsed .rail-head .ic { width: 24px; }
 body.rail-collapsed .arm,
 body.rail-collapsed .ms { width: 20px; height: 18px; padding: 0; font-size: 10px; }
 
@@ -608,3 +620,7 @@ input[type="range"] { accent-color: var(--accent, #00c6d1); }
 .notes-side { display: flex; flex-direction: column; min-height: 0; max-height: 190px; }
 .notes-side .notes { flex: 1 1 auto; min-height: 0; max-height: none; }
 .notes-side .notes-head { padding-top: 2px; }
+
+/* the extra heads must stack at exactly their own heights or they drift */
+#track-list { display: flex; flex-direction: column; flex: 0 0 auto; }
+#track-list .track-head { margin: 0; }

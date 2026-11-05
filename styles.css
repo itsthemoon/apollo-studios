@@ -160,7 +160,7 @@ ul { padding-left: 18px; }
   border-radius: 9999px; background: var(--pill); font-size: 12px; }
 .addtrack span { color: var(--cyan); }
 
-.track-head { flex: 0 0 var(--row-h); height: var(--row-h); margin: 2px 0 0; }
+.track-head { flex: 0 0 var(--row-h); height: var(--row-h); margin: 0; }
 .th-inner { height: 100%; background: rgba(194, 215, 242, 0.16); padding: 4px 8px; overflow: hidden;
   display: flex; flex-direction: column; gap: 2px; border-bottom: 1px solid var(--line); }
 .track-head.on .th-inner { box-shadow: inset 2px 0 0 var(--cyan); }
@@ -248,9 +248,12 @@ ul { padding-left: 18px; }
 .clip[data-full] { width: 100%; min-width: 0; }
 .clip-head { display: flex; align-items: center; gap: 6px; height: 18px; padding: 0 6px;
   background: color-mix(in srgb, var(--track-color, #00c6d1) 24%, transparent); }
-.clip-head h3 { font-size: 10.5px; font-weight: 600; color: #d6f6f8;
+.clip-head h3 { flex: 1 1 auto; min-width: 0; font-size: 10.5px; font-weight: 600; color: #d6f6f8;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.clip-gain { margin-left: auto; font-family: var(--mono); font-size: 9px; color: #a8e6ea; white-space: nowrap; }
+.clip { container-type: inline-size; }
+.clip-gain { margin-left: auto; flex: 0 0 auto; font-family: var(--mono); font-size: 9px; color: #a8e6ea; white-space: nowrap; }
+/* a two-bar region has no room for a second label, so the name wins */
+@container (max-width: 150px) { .clip-gain { display: none; } }
 #wave { display: block; width: 100%; height: calc(100% - 18px); min-height: 20px; }
 .fade { position: absolute; top: 18px; bottom: 0; width: 12px; pointer-events: none; }
 .fade.in { left: 0; background: linear-gradient(to right, rgba(1, 1, 1, 0.45), transparent); }
