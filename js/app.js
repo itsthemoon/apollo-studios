@@ -217,23 +217,35 @@ function drawTake(canvas, take) {
     rms[x] = n ? Math.sqrt(sum / n) : 0
   }
 
-  g.strokeStyle = '#6fa8ff'
+  /* One silhouette, not a picket fence: the top edge runs left to right, the
+     mirrored bottom edge runs back, and the whole thing fills. Column pairs
+     used to merge into flat blocks on loud material. */
+  g.fillStyle = '#6fa8ff'
+  g.globalAlpha = 0.55
   g.beginPath()
   for (let x = 0; x < canvas.width; x++) {
-    const amp = d(rms[x]) * (mid - 2) * 0.92
-    g.moveTo(x + 0.5, mid - amp)
+    const amp = Math.max(0.6, d(rms[x]) * (mid - 2) * 0.92)
+    g.lineTo(x + 0.5, mid - amp)
+  }
+  for (let x = canvas.width - 1; x >= 0; x--) {
+    const amp = Math.max(0.6, d(rms[x]) * (mid - 2) * 0.92)
     g.lineTo(x + 0.5, mid + amp)
   }
-  g.stroke()
+  g.closePath()
+  g.fill()
 
   g.beginPath()
   for (let x = 0; x < canvas.width; x++) {
     const h = d(peaks[x]) * (mid - 1)
-    g.moveTo(x + 0.5, mid - h)
+    g.lineTo(x + 0.5, mid - h)
+  }
+  for (let x = canvas.width - 1; x >= 0; x--) {
+    const h = d(peaks[x]) * (mid - 1)
     g.lineTo(x + 0.5, mid + h)
   }
-  g.globalAlpha = 0.4
-  g.stroke()
+  g.closePath()
+  g.globalAlpha = 0.22
+  g.fill()
   g.globalAlpha = 1
 
   g.strokeStyle = '#2c4a52'
@@ -393,20 +405,43 @@ function drawRegionWave(track, clip, region) {
     if (band) band.push([x, amp])
     else steps.set(step, [[x, amp]])
   }
-  const colW = Math.max(1, Math.ceil(px / cols))
+  /* Each brightness band is one silhouette: top edge out, mirrored bottom edge
+     back, filled — a shape rather than a row of tiles. */
+  const at = (x, h) => [Math.floor((x * px) / cols) + 0.5, h]
   for (const [step, items] of steps) {
     const k = step / 15
     g.fillStyle = `rgb(${Math.round(111 * k)},${Math.round(168 * k)},${Math.round(255 * k)})`
-    g.globalAlpha = 0.95
+    g.globalAlpha = 0.55
+    g.beginPath()
     for (const [x, amp] of items) {
-      const h = lit(rms[x]) * amp * (mid - 2)
-      if (h > 0) g.fillRect(Math.floor((x * px) / cols), mid - h, colW, h * 2)
+      const h = Math.max(0.6, lit(rms[x]) * amp * (mid - 2))
+      const [cx] = at(x, h)
+      g.lineTo(cx, mid - h)
     }
-    g.globalAlpha = 0.35
+    for (let i = items.length - 1; i >= 0; i--) {
+      const [x, amp] = items[i]
+      const h = Math.max(0.6, lit(rms[x]) * amp * (mid - 2))
+      const [cx] = at(x, h)
+      g.lineTo(cx, mid + h)
+    }
+    g.closePath()
+    g.fill()
+
+    g.globalAlpha = 0.2
+    g.beginPath()
     for (const [x, amp] of items) {
       const h = lit(peak[x]) * amp * (mid - 1)
-      if (h > 0) g.fillRect(Math.floor((x * px) / cols), mid - h, colW, h * 2)
+      const [cx] = at(x, h)
+      g.lineTo(cx, mid - h)
     }
+    for (let i = items.length - 1; i >= 0; i--) {
+      const [x, amp] = items[i]
+      const h = lit(peak[x]) * amp * (mid - 1)
+      const [cx] = at(x, h)
+      g.lineTo(cx, mid + h)
+    }
+    g.closePath()
+    g.fill()
   }
   g.globalAlpha = 1
   g.strokeStyle = '#2c4a52'

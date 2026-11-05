@@ -14,8 +14,8 @@
   --line-hi: rgba(194, 215, 242, 0.18);
   --ink: #ffffff;
   --text: rgba(194, 215, 242, 0.92);
-  --mute: rgba(194, 215, 242, 0.64);
-  --dim: rgba(194, 215, 242, 0.44);
+  --mute: rgba(214, 228, 246, 0.72);
+  --dim: rgba(206, 222, 244, 0.56);
   --faint: rgba(194, 215, 242, 0.24);
   --cyan: #00c6d1;
   --red: #e0362c;
@@ -216,7 +216,9 @@ ul { padding-left: 18px; }
   border-bottom: 1px solid var(--line); overflow: hidden; }
 .ruler { display: flex; flex: 0 0 auto; height: 100%; }
 .bar { flex: 0 0 var(--bar); font-size: 11px; color: var(--dim); padding: 22px 0 0 6px; }
-.bar.on { color: var(--text); background: rgba(224, 54, 44, 0.10); }
+{ color: var(--text); font-weight: 600; }
+/* the bar the playhead sits in gets a tick, not a red band */
+.bar.on { color: var(--text); font-weight: 600; box-shadow: inset 0 3px 0 var(--cyan); }
 .loop-region { position: absolute; top: 0; bottom: 0; background: rgba(0, 198, 209, 0.14);
   border-left: 1px solid var(--cyan); border-right: 1px solid var(--cyan); }
 .ruler-tools { position: absolute; right: 10px; bottom: 5px; display: flex; align-items: center; gap: 6px;
