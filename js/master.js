@@ -193,12 +193,12 @@ export function compress(stereo, opts, sampleRate) {
 // Lookahead-free peak limiter. Instant attack (gain reduction), short one-pole
 // release so the gain does not chatter, then a hard clamp so no sample exceeds
 // the ceiling. Stereo-linked. ceilingDb is clamped to 0 dBFS.
-export function limit(stereo, ceilingDb) {
+export function limit(stereo, ceilingDb, opts = {}) {
   validateStereo(stereo)
   const ceiling = dbToLin(Number.isFinite(ceilingDb) ? Math.min(ceilingDb, 0) : 0)
   const n = stereo.left.length
-  const left = new Float32Array(n)
-  const right = new Float32Array(n)
+  const left = opts.inPlace ? stereo.left : new Float32Array(n)
+  const right = opts.inPlace ? stereo.right : new Float32Array(n)
   let env = 1
   for (let i = 0; i < n; i++) {
     const l = clean(stereo.left[i])
@@ -216,14 +216,14 @@ export function limit(stereo, ceilingDb) {
     left[i] = yl
     right[i] = yr
   }
-  return { left, right }
+  return opts.inPlace ? stereo : { left, right }
 }
 
 // ---- RMS normalisation ------------------------------------------------------
 
 // Measures stereo RMS, returns { stereo, gainDb } where the scaled buffers move
 // RMS to targetDb. Gain is capped at +24 dB; silence gets gain 0.
-export function normalizeRms(stereo, targetDb) {
+export function normalizeRms(stereo, targetDb, opts = {}) {
   validateStereo(stereo)
   const target = Number.isFinite(targetDb) ? targetDb : -14
   const n = stereo.left.length
@@ -243,13 +243,17 @@ export function normalizeRms(stereo, targetDb) {
   let gainDb = target - rmsDb
   if (gainDb > NORMALIZE_GAIN_CAP_DB) gainDb = NORMALIZE_GAIN_CAP_DB
   const g = dbToLin(gainDb)
-  const left = new Float32Array(n)
-  const right = new Float32Array(n)
+  // inPlace: the caller hands over a buffer it will not read again, so the pass
+  // writes straight back into it instead of allocating another 2 x n floats
+  const left = opts.inPlace ? stereo.left : new Float32Array(n)
+  const right = opts.inPlace ? stereo.right : new Float32Array(n)
   for (let i = 0; i < n; i++) {
-    left[i] = clean(stereo.left[i]) * g
-    right[i] = clean(stereo.right[i]) * g
+    const l = clean(stereo.left[i]) * g
+    const r = clean(stereo.right[i]) * g
+    left[i] = l
+    right[i] = r
   }
-  return { stereo: { left, right }, gainDb }
+  return { stereo: opts.inPlace ? stereo : { left, right }, gainDb }
 }
 
 // ---- master chain -----------------------------------------------------------
@@ -263,7 +267,7 @@ export function normalizeRms(stereo, targetDb) {
 // }
 // report.gainDb is the static gain applied (comp makeup + normalise gain);
 // peakDb/rmsDb are measured on the final, post-limiter output.
-export function masterChain(stereo, settings, sampleRate) {
+export function masterChain(stereo, settings, sampleRate, opts = {}) {
   validateStereo(stereo)
   const sr = validateRate(sampleRate, 'masterChain')
   const s = settings ?? {}
@@ -272,10 +276,12 @@ export function masterChain(stereo, settings, sampleRate) {
   const targetRmsDb = Number.isFinite(s.targetRmsDb) ? s.targetRmsDb : -14
   const makeupDb = Number.isFinite(comp.makeupDb) ? comp.makeupDb : 0
 
+  // opts.inPlace: the export path owns its copy of the take, so the tail passes
+  // scale and limit the same buffers instead of allocating two more full copies
   let cur = applyEQ(stereo, s.eq ?? [], sr)
   cur = compress(cur, comp, sr)
-  const normalized = normalizeRms(cur, targetRmsDb)
-  const out = limit(normalized.stereo, limitDb)
+  const normalized = normalizeRms(cur, targetRmsDb, opts)
+  const out = limit(normalized.stereo, limitDb, opts)
   const { peakDb, rmsDb } = analyze(out)
   return { stereo: out, report: { peakDb, rmsDb, gainDb: normalized.gainDb + makeupDb } }
 }

@@ -100,6 +100,11 @@ function download(blob, name) {
 
 // ---- master settings from the panel ---------------------------------------
 function settings() {
+  // Bypass is A/B: everything downstream reads the same object, so an empty
+  // chain is what "before" sounds like.
+  if (state.masterBypass) {
+    return { eq: [], comp: { thresholdDb: 0, ratio: 1, attackMs: 8, releaseMs: 140, makeupDb: 0 }, limitDb: 0, inputDb: 0 }
+  }
   return {
     eq: state.bands.map(b => ({ ...b })),
     comp: {
@@ -1258,9 +1263,14 @@ function exportBuffer() {
   let mix = tuned.length
     ? tune.renderTuned(state.take, state.notes, { sampleRate: state.sampleRate }).samples
     : state.take
-  if (state.region.reverse) { mix = Float32Array.from(mix); mix.reverse() }
+  // reverse in place: if the tuned path already handed us its own copy, the take
+  // itself must stay forward for playback
+  if (state.region.reverse) {
+    if (mix === state.take) mix = Float32Array.from(mix)
+    mix.reverse()
+  }
   if (state.region.gainDb) mix = gainDb(mix, state.region.gainDb)
-  const { stereo, report } = masterChain(stereoFrom(mix), settings(), state.sampleRate)
+  const { stereo, report } = masterChain(stereoFrom(mix), settings(), state.sampleRate, { inPlace: true })
   const bytes = encodeWav(stereo, rate)
   return { bytes, report, tuned: tuned.length, rate }
 }
@@ -1284,6 +1294,7 @@ function boot() {
   $('in-character').innerHTML = voicechar.CHARACTERS.map(c => `<option value="${c.name}">${c.name}</option>`).join('')
   $('in-genre').innerHTML = beat.GENRES.map(g => `<option value="${g.name}">${g.name}</option>`).join('')
   $('in-instrument').innerHTML = automix.INSTRUMENTS.map(i => `<option value="${i.name}">${i.name}</option>`).join('')
+  state.masterBypass = false
   state.bands = [
     { kind: 'highpass', freq: 30, q: 0.71, gainDb: 0 },
     { kind: 'lowshelf', freq: 90, q: 0.71, gainDb: 0 },
@@ -1311,6 +1322,13 @@ function boot() {
   $('btn-play').addEventListener('click', guard(play))
   $('btn-stop').addEventListener('click', stopPlayback)
   $('btn-analyze').addEventListener('click', guard(readMeter))
+  $('btn-master-ab').addEventListener('click', () => {
+    state.masterBypass = !state.masterBypass
+    $('btn-master-ab').setAttribute('aria-pressed', String(state.masterBypass))
+    $('btn-master-ab').classList.toggle('on', state.masterBypass)
+    $('preset-state').textContent = state.masterBypass ? 'bypassed — hearing the dry take' : 'factory patches'
+    if (state.playing.length) play()
+  })
   $('btn-export').addEventListener('click', guard(exportWav))
   // #btn-save is owned by js/persist.js (local slot + Last Saved stamp)
   $('btn-demo').addEventListener('click', guard(loadDemo))
