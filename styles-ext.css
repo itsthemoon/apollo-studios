@@ -633,3 +633,9 @@ input[type="range"] { accent-color: var(--accent, #00c6d1); }
 /* the extra heads must stack at exactly their own heights or they drift */
 #track-list { display: flex; flex-direction: column; flex: 0 0 auto; }
 #track-list .track-head { margin: 0; }
+
+/* a frozen track reads as inert: its controls stay live but the row recedes */
+.track-head.frozen .th-inner { opacity: 0.62; }
+.track-head.frozen { box-shadow: inset 2px 0 0 #8fd3ff; }
+.track-head.frozen .ticon { color: #8fd3ff; }
+.track-head.frozen [data-mute], .track-head.frozen [data-solo] { opacity: 1; }

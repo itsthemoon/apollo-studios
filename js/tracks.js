@@ -130,6 +130,7 @@ export function createTrack(spec = {}) {
     mute: false,
     solo: false,
     armed: false,
+    frozen: false,
     sends: { reverb: 0, delay: 0 },
     chain: [],
     roll: null,

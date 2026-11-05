@@ -841,6 +841,13 @@ function setRegion(patch) {
 
 async function playNotes(notes, opts = {}) {
   if (!state.take?.length || !notes?.length) return
+  // a frozen track plays its render, not the live take
+  const frozen = state.tracks?.find((t) => t.id === state.active)
+  if (frozen?.frozen) {
+    // restored projects carry the flag but not the audio: render on demand
+    if (!frozen.bounced?.data?.length) state.bounceTrack?.(frozen)
+    if (frozen.bounced?.data?.length) return playBuffer(frozen.bounced.data)
+  }
   stopPlayback()
   const ctx = new AudioContext({ sampleRate: state.sampleRate })
   state.ctx = ctx

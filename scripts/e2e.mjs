@@ -492,6 +492,22 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(18, 'freeze renders the track and unfreeze restores it', `
+probe("document.querySelectorAll('[data-track-menu]')[0].click()")
+time.sleep(0.3)
+probe("window.__menuOpen = !document.getElementById('menu-track').hidden")
+probe("document.querySelector('[data-track-act=freeze]').click()")
+time.sleep(0.8)
+emit(probe("var t = window.VS.state.tracks[0];"
+           " var host = document.querySelector('[data-track]');"
+           " return JSON.stringify({frozen: t.frozen, samples: t.bounced ? t.bounced.data.length : 0,"
+           " peak: t.bounced ? +t.bounced.peak.toFixed(3) : 0, cls: host.className, id: host.dataset.track, model: t.id,"
+           " menu: window.__menuOpen, label: document.querySelector('[data-track-act=freeze]').textContent.trim()})"))
+`, d => d.menu === true && d.frozen === true && d.samples > 1000 && d.peak > 0
+      && d.cls.includes('frozen') && d.id === d.model
+      ? { pass: true, detail: `froze with a ${d.samples} sample render (peak ${d.peak}); head class ${d.cls}, id matches the model` }
+      : { pass: false, detail: `menu=${show(d.menu)} frozen=${show(d.frozen)} samples=${show(d.samples)} peak=${show(d.peak)} id=${show(d.id)}/${show(d.model)}` })
+
 step(17, 'the Create menu still carries every item and a ruler loop arms', `
 probe("document.querySelector('#menu-create [data-create=sounds]').click()")
 time.sleep(0.4)

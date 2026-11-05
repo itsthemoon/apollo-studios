@@ -8,6 +8,7 @@ import * as automation from './automation.js'
 import * as synth from './synth.js'
 import * as drums from './drums.js'
 import * as library from './library.js'
+import * as bounce from './bounce.js'
 import * as versions from './versions.js'
 import * as mastering2 from './mastering2.js'
 import * as shifter from './shifter.js'
@@ -78,17 +79,33 @@ export function attach(app) {
 
   /* the first track's markup is static, so its data-* hooks carry the placeholder
      index 1 until the model hands out a real id — rebind them here */
-  const staticId = state.tracks[0].id
-  const rebind = (root) => {
-    root.querySelectorAll('[data-track],[data-fx],[data-mute],[data-solo],[data-arm],[data-vol],[data-pan],[data-fx-count],[data-vol-read],[data-automation],[data-track-menu],[data-auto-param],[data-clip],[data-clip-gain],[data-row]').forEach((el) => {
-      for (const key of ['track','fx','mute','solo','arm','vol','pan','fxCount','volRead','automation','trackMenu','clip','clipGain','row']) {
-        const attr = 'data-' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
-        if (el.getAttribute(attr) === '1' || el.getAttribute(attr) === '1:pan') {
-          el.setAttribute(attr, el.getAttribute(attr) === '1:pan' ? `${staticId}:pan` : staticId)
+  let staticId = state.tracks[0].id
+  const HOOKS = ['track','fx','mute','solo','arm','vol','pan','fxCount','volRead','automation','trackMenu','clip','clipGain','row']
+  const hookAttr = (key) => 'data-' + key.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())
+  const rebind = (root, from = '1') => {
+    if (!root) return
+    // the root itself carries a hook too, and querySelectorAll skips it
+    [root, ...root.querySelectorAll(HOOKS.map((k) => `[${hookAttr(k)}]`).join(','))].forEach((el) => {
+      for (const key of HOOKS) {
+        const attr = hookAttr(key)
+        if (el.getAttribute(attr) === from || el.getAttribute(attr) === `${from}:pan`) {
+          el.setAttribute(attr, el.getAttribute(attr) === `${from}:pan` ? `${staticId}:pan` : staticId)
         }
       }
     })
   }
+  // the first track's static shell has to follow the model when the project is
+  // replaced (demo, new project, load), or every control on it points at a dead id
+  const adoptStatic = () => {
+    const first = state.tracks[0]
+    if (!first || first.id === staticId) return
+    const from = staticId
+    staticId = first.id
+    rebind($('track-1'), from)
+    rebind($('clip-1'), from)
+    rebind(document.querySelector(`[data-row="${from}"]`), from)
+  }
+  state.adoptStatic = adoptStatic
   rebind($('track-1'))
   rebind($('clip-1'))
   rebind(document.querySelector('[data-row="1"]'))
@@ -294,6 +311,7 @@ export function attach(app) {
   const clamps = { vol: tracks.clampDb, pan: tracks.clampPan }
 
   function renderTrackList() {
+    state.adoptStatic?.()
     const host = $('track-list')
     const laneRows = $('lane-rows')
     host.innerHTML = ''
@@ -354,6 +372,16 @@ export function attach(app) {
 
   function findTrack(id) { return state.tracks.find(t => t.id === id) }
 
+  // Freeze and bounce render the track's regions to one buffer, the way a DAW
+  // does: the transport then plays the render instead of re-reading the take.
+  function bounceTrack(track) {
+    if (!state.take?.length) return null
+    const { data, peak, regions } = bounce.renderTrack(state.take, bpmNow(), track, state.sampleRate)
+    track.bounced = { data, peak, regions, at: Date.now() }
+    return track.bounced
+  }
+  state.bounceTrack = bounceTrack
+
   document.addEventListener('click', (e) => {
     const head = e.target.closest('.track-head')
     if (!head || e.target.closest('button, input, [contenteditable]')) return
@@ -377,6 +405,18 @@ export function attach(app) {
     if (p) p.value = String(t.pan * 100)
     const c = document.querySelector(`[data-colour="${t.id}"]`)
     if (c) c.dataset.colour = String(t.color)
+    // freeze reads on the row: a snowflake in place of the type icon and a
+    // dimmed head, the way the product marks frozen tracks
+    const head = document.querySelector(`[data-track="${t.id}"]`)
+    if (head) {
+      head.classList.toggle('frozen', Boolean(t.frozen))
+      const icon = head.querySelector('.ticon')
+      if (icon) { icon.dataset.icon = t.frozen ? 'snowflake' : tracks.typeInfo(t.type).icon; icons.hydrate(icon) }
+      const label = document.querySelector('[data-track-act="freeze"]')
+      if (label && label.closest('#menu-track') && state.fxTarget === t.id) {
+        label.lastChild.textContent = t.frozen ? 'Unfreeze track' : 'Freeze track'
+      }
+    }
     const n = document.querySelector(`[data-track="${t.id}"] .tname`)
     if (n && n.textContent !== t.name) n.textContent = t.name
     const fc = document.querySelector(`[data-fx-count="${t.id}"]`)
@@ -503,7 +543,21 @@ export function attach(app) {
     if (act === 'duplicate') { const copy = tracks.duplicateTrack(state.tracks, t.id); if (copy) { copy.chain = fx.createChain(); if (copy.roll) state.rolls.set(copy.id, roll.createRoll()) } renderTrackList(); syncAudibility(); app.log(`duplicated ${t.name}`) }
     if (act === 'colour') { tracks.setColor(t, (t.color % 6) + 1); syncTrackDom(t) }
     if (act === 'automation') { state.showAutomation = true; toggleAutomation(true) }
-    if (act === 'bounce') { app.log(`bounced ${t.name} to audio`); app.status('bounced') }
+    if (act === 'bounce') {
+      const made = bounceTrack(t)
+      if (made) { app.log(`bounced ${t.name} to audio (${Math.round(made.data.length / state.sampleRate)}s)`); app.status('bounced') }
+      else app.log('record or load a take first')
+    }
+    if (act === 'freeze') {
+      if (t.frozen) { t.frozen = false; app.log(`unfroze ${t.name}`) }
+      else {
+        if (!t.bounced) bounceTrack(t)
+        t.frozen = true
+        app.log(`froze ${t.name}${t.bounced ? ' — playing its render' : ' (no take yet)'}`)
+      }
+      syncTrackDom(t)
+      if (state.playing.length) $('in-gain').dispatchEvent(new Event('input'))
+    }
     if (act === 'delete') {
       if (state.tracks.length === 1) { app.log('the last track stays'); return }
       tracks.removeTrack(state.tracks, t.id)

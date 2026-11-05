@@ -79,6 +79,15 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v)
 const num = (v, fallback, lo, hi) => (Number.isFinite(v) ? clamp(v, lo, hi) : fallback)
 const clone = (v) => JSON.parse(JSON.stringify(v))
+
+// A track carries its freeze render as a Float32Array, which JSON would turn
+// into one key per sample. Drop it: `frozen` survives and the first play or
+// bounce re-renders it.
+const storeTrack = (t) => {
+  const { bounced, ...rest } = t
+  void bounced
+  return rest
+}
 const slug = (s) => String(s || 'project').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project'
 
 // The scale table the roll's "Lock to scale" needs; the editor keeps the same
@@ -201,6 +210,7 @@ export function install({ state, log } = {}) {
     t.mute = raw.mute === true
     t.solo = raw.solo === true
     t.armed = raw.armed === true
+    t.frozen = raw.frozen === true
     t.sends = { reverb: num(raw.sends?.reverb, 0, 0, 1), delay: num(raw.sends?.delay, 0, 0, 1) }
     t.automation = {
       volume: normalisePoints(raw.automation?.volume, -60, 6),
@@ -259,7 +269,7 @@ export function install({ state, log } = {}) {
       quantize: $('in-quantize')?.checked === true,
       snapBeats: num(state.snapBeats, 0, 0, 4),
       timesig: String(state.studio?.state?.timesig || '4/4'),
-      tracks: clone(state.tracks),
+      tracks: state.tracks.map((t) => clone(storeTrack(t))),
       rolls: [...state.rolls].map(([id, r]) => [id, r ? roll.cloneRoll(r) : null]),
       patterns: [...state.patterns].map(([id, p]) => [id, clone(p)]),
       notes: clone(state.notes),
