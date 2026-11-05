@@ -646,3 +646,17 @@ body[data-tl-tool="razor"] .tl-edge { cursor: crosshair; }
 body[data-tl-tool="draw"] #lane .lane-row { cursor: copy; }
 .ruler-tools .tool[aria-pressed="true"] { background: var(--cyan); color: var(--ink); }
 .tl-drawing { cursor: copy; }
+
+/* a comment is a pin on the ruler, sitting above the bar labels */
+.comment-pin { position: absolute; top: 2px; width: 9px; height: 9px; padding: 0; border: 0;
+  border-radius: 2px 2px 2px 0; background: var(--cyan); transform: translateX(-1px) rotate(45deg); cursor: pointer; }
+.comment-pin:hover { background: #fff; }
+.chatpin { border-left: 2px solid var(--cyan); padding-left: 6px; }
+
+/* session presence: overlapping initials, the owner first */
+.presence { display: inline-flex; align-items: center; }
+.presence .who { display: inline-grid; place-items: center; width: 24px; height: 24px; margin-left: -6px;
+  border-radius: 50%; font: 600 10px/1 var(--mono); color: var(--ink); background: #55708a;
+  border: 2px solid var(--panel); }
+.presence .who:first-child { margin-left: 0; }
+.presence .who.me { background: var(--cyan); }

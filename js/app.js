@@ -39,6 +39,8 @@ const state = {
   playing: [],
   live: [],
   loopOn: false,
+  comments: [],
+  collabs: [],
   region: { pitch: 0, rate: 1, gainDb: 0, reverse: false },
   peakCache: null,
   ctx: null,

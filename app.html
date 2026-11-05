@@ -18,6 +18,7 @@
     <span class="projwrap"><input id="proj-name" class="proj" value="demo session" aria-label="Project name"></span>
 
     <span class="hdr-right">
+      <span class="presence" id="presence" role="group" aria-label="In this session"></span>
       <span class="saved"><span>Last saved</span><b id="saved-at">Never</b></span>
       <button id="btn-save" class="pill ghost tiny" type="button" aria-label="Save"><span data-icon="save" aria-hidden="true"></span>Save</button>
       <button class="pill publish" type="button" id="btn-publish"><span aria-hidden="true" data-icon="globe"></span>Publish</button>
@@ -586,6 +587,10 @@
   <button role="menuitem" type="button" data-track-act="bounce"><span data-icon="download" aria-hidden="true"></span>Bounce to audio</button>
   <button role="menuitem" type="button" data-track-act="freeze"><span data-icon="snowflake" aria-hidden="true"></span>Freeze track</button>
   <button role="menuitem" type="button" data-track-act="delete"><span data-icon="trash" aria-hidden="true"></span>Delete track</button>
+</div>
+
+<div class="menu" id="menu-ruler" role="menu" hidden>
+  <button role="menuitem" type="button" data-ruler-act="comment"><span data-icon="chat" aria-hidden="true"></span>Comment at playhead</button>
 </div>
 
 <div class="menu" id="menu-region" role="menu" hidden>

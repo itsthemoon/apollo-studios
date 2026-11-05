@@ -2493,6 +2493,40 @@ export function attach(app) {
     e.preventDefault()
     openMenu($('menu-region'), e.clientX, e.clientY)
   })
+  // comments pin to a beat on the ruler, like the product's session notes
+  function paintComments() {
+    const ruler = $('ruler')
+    ruler.querySelectorAll('.comment-pin').forEach((n) => n.remove())
+    for (const c of state.comments) {
+      const pin = document.createElement('button')
+      pin.type = 'button'
+      pin.className = 'comment-pin'
+      pin.dataset.comment = c.id
+      pin.style.left = `${Math.min(100, Math.max(0, (c.beat / Math.max(1, beatsOf(ruler.getBoundingClientRect().width))) * 100))}%`
+      pin.title = `${c.who}: ${c.text}`
+      pin.setAttribute('aria-label', `Comment at bar ${Math.floor(c.beat / barBeats()) + 1}: ${c.text}`)
+      pin.addEventListener('click', (e) => { e.stopPropagation(); app.openPanel('chat'); document.getElementById('in-chat')?.focus() })
+      ruler.append(pin)
+    }
+  }
+  state.paintComments = paintComments
+
+  $('ruler').addEventListener('contextmenu', (e) => {
+    e.preventDefault()
+    openMenu($('menu-ruler'), e.clientX, e.clientY)
+  })
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-ruler-act]')
+    if (!b) return
+    $('menu-ruler').hidden = true
+    if (b.dataset.rulerAct !== 'comment') return
+    const text = window.prompt('Comment at the playhead')
+    if (!text || !text.trim()) return
+    state.comments.push({ id: `c${Date.now()}`, who: 'You', beat: playheadBeats(), text: text.trim().slice(0, 200) })
+    paintComments()
+    state.renderChat?.()
+    app.log(`comment at ${playheadBeats().toFixed(1)} beats`)
+  })
   $('ruler').addEventListener('click', (e) => {
     const box = $('lane').getBoundingClientRect()
     state.loop = { from: Math.max(0, e.clientX - box.left), to: Math.max(0, e.clientX - box.left) }

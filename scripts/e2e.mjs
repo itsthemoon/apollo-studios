@@ -492,6 +492,28 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(20, 'an invite shows a presence avatar and a ruler comment lands', `
+emit(click("#btn-invite"))
+time.sleep(0.3)
+probe("var i = document.getElementById('in-invite'); i.value = 'sam@example.com';"
+      " i.dispatchEvent(new Event('input')); document.getElementById('btn-invite').click()")
+time.sleep(0.3)
+probe("window.prompt = () => 'tighter here'")
+box = probe("var r = document.getElementById('ruler').getBoundingClientRect();"
+            " return JSON.stringify({x: Math.round(r.x + 240), y: Math.round(r.y + 10)})")
+cdp("Input.dispatchMouseEvent", type="mousePressed", x=box["x"], y=box["y"], button="right", buttons=2, clickCount=1)
+cdp("Input.dispatchMouseEvent", type="mouseReleased", x=box["x"], y=box["y"], button="right", buttons=0, clickCount=1)
+time.sleep(0.3)
+probe("document.querySelector('[data-ruler-act=comment]').click()")
+time.sleep(0.4)
+emit(probe("return JSON.stringify({avatars: document.querySelectorAll('#presence .who').length,"
+           " pins: document.querySelectorAll('.comment-pin').length,"
+           " comments: window.VS.state.comments.length,"
+           " text: window.VS.state.comments.at(-1)?.text})"))
+`, d => d.avatars >= 2 && d.pins >= 1 && d.comments >= 1 && d.text === 'tighter here'
+      ? { pass: true, detail: `${d.avatars} presence avatars; comment pinned at the playhead (${d.pins} pin, ${d.comments} total)` }
+      : { pass: false, detail: `avatars=${show(d.avatars)} pins=${show(d.pins)} comments=${show(d.comments)} text=${show(d.text)}` })
+
 step(19, 'the razor splits on click and the draw tool makes a region', `
 probe("document.getElementById('btn-tool-draw').click()")
 row = probe("var rows = [...document.querySelectorAll('.lane-row')]; var r = rows[rows.length - 1]; var b = r.getBoundingClientRect();"

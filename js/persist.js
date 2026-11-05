@@ -282,6 +282,8 @@ export function install({ state, log } = {}) {
       },
       lyrics: clone(state.lyrics),
       chat: clone(state.chat || []),
+      comments: clone(state.comments || []),
+      collabs: clone(state.collabs || []),
       master: { ...state.masterState },
       bands: Array.isArray(state.bands) ? clone(state.bands) : [],
       versions: clone(state.versions || []),
@@ -358,6 +360,8 @@ export function install({ state, log } = {}) {
       })).sort((a, b) => a.start - b.start)
 
       state.lyrics = Array.isArray(data.lyrics) ? clone(data.lyrics) : []
+      state.collabs = Array.isArray(data.collabs) ? data.collabs.filter((c) => c && typeof c.name === 'string').slice(0, 12) : []
+      state.comments = Array.isArray(data.comments) ? data.comments.filter((c) => c && Number.isFinite(c.beat) && typeof c.text === 'string').slice(0, 200) : []
       state.chat = Array.isArray(data.chat) ? clone(data.chat) : []
       state.versions = (Array.isArray(data.versions) ? data.versions : [])
         .filter((v) => v && typeof v === 'object' && v.snapshot)

@@ -377,9 +377,13 @@ export function install({ state, log }) {
     state.chat.push({ who: 'Apollo', text: 'Session chat — anyone you invite sees this thread.' })
   }
   function renderChat() {
-    $('chat-log').innerHTML = state.chat.map((c) => `<p><b>${esc(c.who)}</b> ${esc(c.text)}</p>`).join('')
+    state.renderPresence?.()
+    const pins = (state.comments || []).map((c) => `<p class="chatpin"><b>${esc(c.who)}</b> <span class="hint">bar ${Math.floor(c.beat / 4) + 1}</span> ${esc(c.text)}</p>`).join('')
+    const talk = state.chat.map((c) => `<p><b>${esc(c.who)}</b> ${esc(c.text)}</p>`).join('')
+    $('chat-log').innerHTML = pins + talk
     $('chat-log').scrollTop = $('chat-log').scrollHeight
   }
+  state.renderChat = renderChat
   $('btn-chat-send').addEventListener('click', () => setTimeout(renderChat, 0))
   $('in-chat').addEventListener('keydown', (e) => { if (e.key === 'Enter') setTimeout(renderChat, 0) })
 
@@ -460,10 +464,32 @@ export function install({ state, log }) {
   $('in-invite').setAttribute('placeholder', 'Username or email')
   $('btn-invite').textContent = 'Invite'
   $('btn-invite').setAttribute('aria-label', 'Send the invite')
+  // presence: everyone in the session shows as an avatar in the header
+  function renderPresence() {
+    const host = $('presence')
+    if (!host) return
+    const initials = (name) => name.trim().split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('')
+    host.innerHTML = [
+      `<span class="who me" title="You · owner" aria-label="You, owner">${initials('You')}</span>`,
+      ...state.collabs.map((c) => `<span class="who" title="${esc(c.name)} · ${esc(c.role)}" aria-label="${esc(c.name)}, ${esc(c.role)}">${esc(initials(c.name))}</span>`),
+    ].join('')
+  }
+  state.renderPresence = renderPresence
+  // studio also binds this button and blanks the field first, so the draft is
+  // read as it is typed rather than at click time
+  $('in-invite').addEventListener('input', (e) => { state.inviteDraft = e.target.value })
   $('btn-invite').addEventListener('click', () => {
-    const who = $('in-invite').value.trim()
-    log(`invite: ${who || 'link'} as ${$('in-invite-role').value}`)
+    const who = String(state.inviteDraft || '').trim()
+    const role = $('in-invite-role').value
+    if (who) {
+      const name = who.includes('@') ? who.split('@')[0] : who
+      if (!state.collabs.some((c) => c.name === name)) state.collabs.push({ name, role })
+      renderPresence()
+    }
+    state.inviteDraft = ''
+    log(`invite: ${who || 'link'} as ${role}`)
   })
+  renderPresence()
   const inviteCount = $('m-invite').querySelector('.hint')
   $('in-invite-msg').addEventListener('input', (e) => {
     inviteCount.textContent = `Message · ${e.target.value.length}/256`
