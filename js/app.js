@@ -61,12 +61,16 @@ function status(text) { $('status').textContent = text }
 
 function playheadSeconds() { return state.playhead }
 
-/* bars are drawn to cover the take, not a fixed twenty */
+/* The studio owns the ruler: it derives the bar count from the arrangement and
+   the zoom, and keeps the lane span matched. This is only the pre-attach
+   fallback, and a stale duplicate here is what let the ruler and the lane drift
+   apart by two times. */
 function buildRuler(bars = 24) {
+  if (state.studio?.rebuildRuler) { state.studio.rebuildRuler(); return }
   const ruler = $('ruler')
   const keep = ruler.querySelector('.loop-region')
   ruler.innerHTML = Array.from({ length: bars }, (_, i) => `<span class="bar${i === 0 ? ' on' : ''}">${i + 1}</span>`).join('')
-  ruler.append(keep)
+  if (keep) ruler.append(keep)
 }
 
 /* the lane maps pixels to seconds from the one-bar clip width (--ppb) */

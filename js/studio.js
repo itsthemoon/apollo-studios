@@ -989,6 +989,15 @@ export function attach(app) {
     drawRoll(); refreshRollUi()
     app.log('roll quantized')
   })
+  $('btn-humanize').addEventListener('click', () => {
+    const r = activeRoll()
+    if (!r) return
+    state.undoRoll.push(roll.cloneRoll(r))
+    roll.humanize(r, Math.max(0.01, Number($('in-quant').value) * 0.25))
+    drawRoll(); refreshRollUi()
+
+    app.log(`humanized ${r.notes.length} note${r.notes.length === 1 ? '' : 's'} by up to ${(Number($('in-quant').value) * 0.25).toFixed(3)} beats`)
+  })
   $('btn-lock-scale').addEventListener('click', () => {
     if (state.persist?.lockScale?.()) return
     const r = activeRoll()
@@ -1773,13 +1782,20 @@ export function attach(app) {
     band.hidden = true
     ruler.append(band)
     paintLoop()
+    // the lane and the rows must span exactly the bars the ruler just built, or
+    // pixel<->beat maths and every full-width clip disagree with the ruler
+    laneSpan()
     return bars
   }
 
   // rows carry the zoomed length so the lane can scroll at all
   function laneSpan() {
-    const bars = document.querySelectorAll('#ruler .bar').length || 24
-    const width = `${bars * barPx()}px`
+    // measure the ruler rather than recompute: the bar count and the zoom can
+    // move independently, and a stale span is how a full-width clip ends up
+    // spanning a different number of beats than the ruler above it
+    const ruler = $('ruler')
+    const bars = Math.max(24, document.querySelectorAll('#ruler .bar').length)
+    const width = `${Math.max(bars * barPx(), ruler?.scrollWidth || 0)}px`
     const rows = $('lane-rows')
     if (rows) rows.style.width = width
     document.querySelectorAll('.lane-row').forEach((row) => { row.style.width = width })
@@ -2592,6 +2608,7 @@ export function attach(app) {
   return {
     state,
     renderAll() { renderTrackList(); syncAll(); drawRoll(); renderSounds(); renderVersions() },
+    rebuildRuler,
     drawRoll,
     snap,
     snapPitch,

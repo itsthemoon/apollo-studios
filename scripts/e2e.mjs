@@ -492,6 +492,31 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(19, 'the razor splits on click and the draw tool makes a region', `
+probe("document.getElementById('btn-tool-draw').click()")
+row = probe("var rows = [...document.querySelectorAll('.lane-row')]; var r = rows[rows.length - 1]; var b = r.getBoundingClientRect();"
+            " return JSON.stringify({x: Math.round(b.x + 420), y: Math.round(b.y + b.height * 0.5)})")
+roll_drag(row["x"], row["y"], 90, 0)
+probe("var t = window.VS.state.tracks[window.VS.state.tracks.length - 1]; window.__drawn = (t.clips || []).length")
+probe("window.__before = JSON.stringify(window.VS.state.tracks.map(t => [t.clip.lengthBeats, (t.clips || []).length]))")
+probe("document.getElementById('btn-tool-razor').click()")
+probe("window.__razorPressed = document.getElementById('btn-tool-razor').getAttribute('aria-pressed')")
+box = probe("var c = [...document.querySelectorAll('#lane .clip[data-clip]')].find((n) => n.getBoundingClientRect().width > 40);"
+            " if (!c) return JSON.stringify({x: 0, y: 0, none: true});"
+            " var b = c.getBoundingClientRect();"
+            " return JSON.stringify({x: Math.round(b.x + b.width * 0.5), y: Math.round(b.y + b.height * 0.5)})")
+roll_drag(box["x"], box["y"], 0, 0)
+probe("window.__after = JSON.stringify(window.VS.state.tracks.map(t => [t.clip.lengthBeats, (t.clips || []).length]))")
+emit(probe("return JSON.stringify({before: JSON.parse(window.__before), after: JSON.parse(window.__after),"
+           " drawn: window.__drawn, pressed: window.__razorPressed, none: " + json.dumps(bool(box.get("none"))) + ","
+           " tool: document.body.dataset.tlTool})"))
+probe("document.getElementById('btn-tool-pointer').click()")
+`, d => !d.none && d.pressed === 'true' && d.tool === 'razor'
+      && d.before.some((row2, i) => d.after[i][0] < row2[0] || d.after[i][1] > row2[1])
+      && d.after[d.after.length - 1][1] > d.before[d.after.length - 1][1]
+      ? { pass: true, detail: `draw added a region (${d.before[d.before.length - 1][1]} → ${d.after[d.after.length - 1][1]} on the last track) and the razor split one (${d.before[0][0]} → ${d.after[0][0]} beats)` }
+      : { pass: false, detail: `tool=${show(d.tool)} pressed=${show(d.pressed)} before=${show(d.before)} after=${show(d.after)}` })
+
 step(18, 'freeze renders the track and unfreeze restores it', `
 probe("document.querySelectorAll('[data-track-menu]')[0].click()")
 time.sleep(0.3)

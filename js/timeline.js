@@ -144,6 +144,45 @@ export function install({ state, log }) {
   const listOf = (track) => (Array.isArray(track.clips) ? track.clips : (track.clips = []))
   const playheadBeats = () => Math.max(0, (Number(state.playhead) || 0) * bpm() / 60)
 
+  const snapBeat = (beat) => {
+    const step = state.snapBeats > 0 ? state.snapBeats : 0
+    if (!step) return Math.max(0, beat)
+    return Math.max(0, Math.round(beat / step) * step)
+  }
+  // px per beat as *drawn*. A demo region is stretched to the lane with
+  // data-full, so its own rect is the truthful scale; everywhere else the zoom
+  // scale is.
+  const drawnPxPerBeat = () => {
+    const full = document.querySelector('#lane .clip[data-full]')
+    if (full) {
+      const rect = full.getBoundingClientRect()
+      const region = regionAt(trackOf(full.dataset.clip), Number(full.dataset.regionIndex || 0))
+      if (region?.lengthBeats > 0 && rect.width > 8) return rect.width / region.lengthBeats
+    }
+    return pxPerBeat()
+  }
+  const beatAt = (clientX) => snapBeat((clientX - lane.getBoundingClientRect().left + lane.scrollLeft) / drawnPxPerBeat())
+
+  // ---- tools: pointer is the drag surface, razor splits on click, draw makes
+  // a region out of an empty-space drag
+  const TOOLS = ['pointer', 'razor', 'draw']
+  ui.tool = 'pointer'
+  const setTool = (name) => {
+    if (!TOOLS.includes(name)) return name
+    ui.tool = name
+    document.body.dataset.tlTool = name
+    for (const tool of TOOLS) {
+      const b = $(`btn-tool-${tool}`)
+      if (b) b.setAttribute('aria-pressed', String(tool === name))
+    }
+    return name
+  }
+  state.setTool = setTool
+  for (const tool of TOOLS) $(`btn-tool-${tool}`)?.addEventListener('click', () => {
+    setTool(tool)
+    log(`${tool} tool`)
+  })
+
   function pick(e) {
     const node = e.target.closest?.('.clip')
     if (!node) return null
@@ -992,6 +1031,16 @@ export function install({ state, log }) {
     if (e.target.closest('.tl-trim, .tl-fade, .auto-canvas, .auto-legend')) return
     const hit = pick(e)
     if (!hit) return
+    if (ui.tool === 'razor') {
+      const rect = hit.node.getBoundingClientRect()
+      const frac = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 0.5
+      const at = snapBeat(hit.region.startBeat + frac * hit.region.lengthBeats)
+      const before = clipSnapshot()
+      const made = splitRegion(hit.track, hit.index, at)
+      if (made) { pushClipUndo(before); mark(hit.track); syncLanes(); log(`razor split at ${at.toFixed(2)} beats`) }
+      else log('razor: that click is too close to an edge')
+      return
+    }
     const key = selKey(hit.track.id, hit.index)
     if (e.shiftKey || e.metaKey) {
       toggleSelection(key)
@@ -1011,6 +1060,16 @@ export function install({ state, log }) {
     if (!lane.contains(e.target)) return
     if (pick(e)) return
     if (e.target.closest('button, input, select, a, .auto-canvas, .auto-legend')) return
+    if (ui.tool === 'draw') {
+      const row = e.target.closest('.lane-row')
+      const track = row ? trackOf(row.dataset.row) : null
+      if (track) {
+        ui.draw = { pointerId: e.pointerId, track: track.id, from: beatAt(e.clientX), x0: e.clientX, moved: false }
+        document.body.classList.add('tl-drawing')
+        try { lane.setPointerCapture(e.pointerId) } catch { /* capture is a nicety */ }
+        return
+      }
+    }
     ui.marquee = { pointerId: e.pointerId, x0: e.clientX, y0: e.clientY, base: new Set(ui.sel), moved: false }
     document.body.classList.add('tl-marqueeing')
     try { lane.setPointerCapture(e.pointerId) } catch { /* capture is a nicety */ }
@@ -1087,6 +1146,25 @@ export function install({ state, log }) {
   }, true)
 
   document.addEventListener('pointerup', (e) => {
+    if (ui.draw && e.pointerId === ui.draw.pointerId) {
+      const at = beatAt(e.clientX)
+      const track = trackOf(ui.draw.track)
+      const from = Math.min(ui.draw.from, at)
+      const len = Math.max(MIN_BEATS, Math.abs(at - ui.draw.from))
+      ui.draw = null
+      document.body.classList.remove('tl-drawing')
+      try { lane.releasePointerCapture(e.pointerId) } catch { /* already gone */ }
+      if (!track) return
+      const before = clipSnapshot()
+      const region = { startBeat: round2(from), lengthBeats: round2(len), gain: 1, fadeIn: 0, fadeOut: 0, stretch: 1 }
+      listOf(track).push(region)
+      pushClipUndo(before)
+      mark(track)
+      syncLanes()
+      setSelection([selKey(track.id, listOf(track).length - 1)])
+      log(`drew a ${len.toFixed(2)} beat region at ${from.toFixed(2)}`)
+      return
+    }
     const band = ui.marquee
     if (band && e.pointerId === band.pointerId) {
       const rect = marqueeRect(e, band)

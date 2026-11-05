@@ -639,3 +639,10 @@ input[type="range"] { accent-color: var(--accent, #00c6d1); }
 .track-head.frozen { box-shadow: inset 2px 0 0 #8fd3ff; }
 .track-head.frozen .ticon { color: #8fd3ff; }
 .track-head.frozen [data-mute], .track-head.frozen [data-solo] { opacity: 1; }
+
+/* tool cursors: the razor cuts at the pointer, the draw tool makes regions */
+body[data-tl-tool="razor"] #lane .clip { cursor: crosshair; }
+body[data-tl-tool="razor"] .tl-edge { cursor: crosshair; }
+body[data-tl-tool="draw"] #lane .lane-row { cursor: copy; }
+.ruler-tools .tool[aria-pressed="true"] { background: var(--cyan); color: var(--ink); }
+.tl-drawing { cursor: copy; }

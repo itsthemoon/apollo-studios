@@ -10,6 +10,7 @@ import {
   deleteNote,
   setVelocity,
   quantize,
+  humanize,
   lockToScale,
   notesInRange,
   rowLabels,
@@ -444,6 +445,34 @@ test('a busy roll stays sorted and inside the window', () => {
   for (let i = 1; i < r.notes.length; i++) ok(r.notes[i].start >= r.notes[i - 1].start, 'sorted')
   ok(r.notes.every((n) => n.midi >= r.lowMidi && n.midi <= r.highMidi), 'pitches inside')
   ok(r.notes.every((n) => n.start >= 0 && n.start + n.dur <= r.lengthBeats + 1e-12), 'inside the roll')
+})
+
+
+test('humanize moves starts and velocities within its range', () => {
+  const r = createRoll({ lengthBeats: 8 })
+  addNote(r, { midi: 60, start: 1, dur: 1, velocity: 100 })
+  addNote(r, { midi: 62, start: 2, dur: 1, velocity: 100 })
+  // a fixed generator that alternates high and low draws
+  let n = 0
+  const rand = () => ((n++ * 2) % 5) / 4
+  humanize(r, 0.1, rand)
+  for (const note of r.notes) {
+    ok(Math.abs(note.start - Math.round(note.start / 0.5) * 0.5) <= 0.6, 'starts stay near where they were')
+    ok(note.start >= 0, 'starts stay inside the roll')
+    ok(note.velocity >= 1 && note.velocity <= 127, 'velocities stay legal')
+  }
+  ok(r.notes.some((note) => Math.abs(note.start - 1) > 1e-9 || Math.abs(note.start - 2) > 1e-9), 'something moved')
+  ok(new Set(r.notes.map((n2) => n2.velocity)).size > 1, 'and velocities differ')
+})
+
+test('humanize is bounded and rejects a bad amount', () => {
+  const r = createRoll({ lengthBeats: 4 })
+  addNote(r, { midi: 60, start: 2, dur: 1 })
+  const before = r.notes[0].velocity
+  humanize(r, 0.02, () => 0.999999)
+  ok(Math.abs(r.notes[0].start - 2) <= 0.021, 'a small amount barely moves the note')
+  ok(Math.abs(r.notes[0].velocity - before) <= 3, 'and barely touches velocity')
+  throws(() => humanize(r, 0), 'zero amount throws')
 })
 
 report()

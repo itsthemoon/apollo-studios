@@ -150,6 +150,23 @@ export function quantize(roll, gridBeats = 0.25, strength = 1) {
   return sortNotes(roll)
 }
 
+// Nudges starts and velocities so a quantized part stops sounding stamped on.
+// `amount` is the half-range: start moves by ±amount beats, velocity by
+// ±amount*VELOCITY_RANGE. `rand` is injectable for a deterministic test.
+export const VELOCITY_RANGE = 120
+
+export function humanize(roll, amount = 0.06, rand = Math.random) {
+  assertRoll(roll)
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('bad amount')
+  for (const note of roll.notes) {
+    const shift = (rand() * 2 - 1) * amount
+    note.start = clampStart(roll, note.start + shift)
+    note.velocity = clamp(Math.round(note.velocity + (rand() * 2 - 1) * amount * VELOCITY_RANGE), 1, 127)
+    note.dur = clampDur(roll, note.start, note.dur)
+  }
+  return sortNotes(roll)
+}
+
 // Snaps every out-of-scale pitch to the nearest pitch class in `scalePitches`
 // (offsets from `rootPitch`, mod 12). Ties resolve downward. Returns the roll.
 export function lockToScale(roll, scalePitches, rootPitch = 0) {

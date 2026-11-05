@@ -123,6 +123,9 @@
         <span class="loop-region" id="loop-region" hidden></span>
       </div>
       <div class="ruler-tools">
+        <button class="ic tool" type="button" id="btn-tool-pointer" data-tool="pointer" aria-label="Select tool" aria-pressed="true"><span data-icon="cursor" aria-hidden="true"></span></button>
+        <button class="ic tool" type="button" id="btn-tool-razor" data-tool="razor" aria-label="Razor tool — click a region to split it" aria-pressed="false"><span data-icon="scissors" aria-hidden="true"></span></button>
+        <button class="ic tool" type="button" id="btn-tool-draw" data-tool="draw" aria-label="Draw tool — drag empty space to add a region" aria-pressed="false"><span data-icon="draw" aria-hidden="true"></span></button>
         <button class="ic" type="button" id="btn-snap" aria-label="Snap to grid" aria-pressed="true"><span data-icon="snap" aria-hidden="true"></span></button>
         <button class="ic" type="button" aria-label="Zoom out" id="btn-zoom-out"><span data-icon="zoom-out" aria-hidden="true"></span></button>
         <button class="ic" type="button" aria-label="Zoom in" id="btn-zoom-in"><span data-icon="zoom-in" aria-hidden="true"></span></button>
@@ -217,6 +220,7 @@
                 <option value="0.25" selected>1/16</option><option value="0.5">1/8</option><option value="1">1/4</option>
               </select></label>
               <button id="btn-quantize" class="pill" type="button">Quantize</button>
+              <button id="btn-humanize" class="pill" type="button" title="Nudge starts and velocities off the grid">Humanize</button>
               <button id="btn-lock-scale" class="pill" type="button">Lock to scale</button>
               <button id="btn-roll-undo" class="pill ghost" type="button">Undo edit</button>
             </div>

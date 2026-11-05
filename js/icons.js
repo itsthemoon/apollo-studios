@@ -8,7 +8,7 @@ const NAMES = [
   'crown', 'save', 'chevron-down', 'music', 'headphones', 'automation', 'dot-circle',
   'dots-v', 'dots-h', 'snap', 'stretch', 'skip-back', 'skip-forward', 'mute', 'solo', 'create',
   'export', 'download', 'history', 'lyrics', 'sounds', 'shortcuts', 'invite',
-  'autopitch', 'duet', 'mixer', 'copy', 'trash', 'reverse', 'droplet', 'snowflake', 'settings', 'file-plus', 'repeat',
+  'autopitch', 'duet', 'mixer', 'copy', 'trash', 'reverse', 'droplet', 'snowflake', 'cursor', 'draw', 'settings', 'file-plus', 'repeat',
   'addtrack', 'arm', 'editor', 'mastering', 'versions', 'publish'
 ]
 
@@ -86,6 +86,8 @@ const PATHS = {
   reverse: '<path d="M3.5 10h13"/><path d="M13.5 6.5 17 10l-3.5 3.5"/><path d="M3.5 6.5v7"/>',
   droplet: '<path d="M10 3.2s4.8 5 4.8 8a4.8 4.8 0 0 1-9.6 0c0-3 4.8-8 4.8-8z"/>',
   snowflake: '<path d="M10 2.5v15M3.5 6.25l13 7.5M16.5 6.25l-13 7.5"/>',
+  cursor: '<path d="M5 3.5 15 10.2l-4.2.9 2.2 4.4-2 1-2.2-4.5L5 15z"/>',
+  draw: '<path d="M4 16l1.2-4.2L13.6 3.4l3 3L8.2 14.8z"/><path d="M12.6 4.4l3 3"/>',
   settings: '<circle cx="10" cy="10" r="2.8"/><path d="M10 2.6v2.2M10 15.2v2.2M2.6 10h2.2M15.2 10h2.2M4.8 4.8l1.6 1.6M13.6 13.6l1.6 1.6M15.2 4.8l-1.6 1.6M6.4 13.6l-1.6 1.6"/>',
   'file-plus': '<path d="M5 3.2h6.2L15 6.8V16.8H5z"/><path d="M11.2 3.2v3.6H15"/><path d="M10 9.8v5M7.5 12.3h5"/>',
   repeat: '<path d="M4 8V6.5A2.5 2.5 0 0 1 6.5 4H16l-2.4-2.2"/><path d="M16 12v1.5a2.5 2.5 0 0 1-2.5 2.5H4l2.4 2.2"/>',
