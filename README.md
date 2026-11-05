@@ -4,12 +4,12 @@
 
 Sing it. Shape it. Ship it.
 
-Apollo Studios is an open-source, local-only vocal studio that runs entirely in a browser tab. Sing a
+Apollo Studios is an open-source, local-first vocal studio that runs entirely in a browser tab. Sing a
 phrase, get editable notes back, tune them to a key, stack harmonies, shape a master, export a WAV.
-No account, no upload, no build step, no dependencies, and no backend beyond a static folder on
-loopback.
+No account, no upload, no build step, no dependencies, and no backend — it is a static folder, served
+from GitHub Pages or from loopback.
 
-Open the hosted studio, or run it locally:
+Watch the [106-second promo](https://github.com/itsthemoon/apollo-studios/releases/download/v1.0.0/apollo_studios_demo.mp4), or run it locally:
 
 ```
 node scripts/serve.mjs      # http://127.0.0.1:4173 — landing page, studio at /app.html
