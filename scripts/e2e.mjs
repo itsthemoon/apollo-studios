@@ -480,6 +480,29 @@ emit(after)
 `, d => d.loaded && d.status === 'ready' && d.rows > 0 && d.take > 0 && d.play && d.presets >= 1
       ? { pass: true, detail: `page reloaded, status "ready", ${d.rows} note rows and ${d.take} take samples restored from this browser, play armed` }
       : { pass: false, detail: `loaded=${d.loaded} status=${show(d.status)} rows=${d.rows} take=${d.take} play=${d.play} presets=${d.presets}` })
+step(12, 'playing drives the strip meters and mute cuts the strip', `
+emit(click("#btn-mixer"))
+time.sleep(0.6)
+probe("document.querySelectorAll('.strip [data-mute][aria-pressed=\\\"true\\\"], .strip [data-solo][aria-pressed=\\\"true\\\"]').forEach(b=>b.click())")
+time.sleep(0.3)
+emit(click("#btn-play"))
+time.sleep(1.6)
+hot = probe("return JSON.stringify({m:[...document.querySelectorAll('.strip-meter i')].map(e=>parseFloat(e.style.height)||0),"
+            " tp:(document.querySelector('[data-tp]')||{}).textContent})")
+emit(click("#btn-play"))
+probe("document.querySelector('.strip [data-mute]').click()")
+time.sleep(0.3)
+emit(click("#btn-play"))
+time.sleep(1.4)
+cold = probe("return JSON.stringify({m:[...document.querySelectorAll('.strip-meter i')].map(e=>parseFloat(e.style.height)||0),"
+             " tp:(document.querySelector('[data-tp]')||{}).textContent})")
+emit(click("#btn-play"))
+probe("document.querySelector('.strip [data-mute]').click()")
+emit({**hot, "cold": cold["m"], "coldTp": cold["tp"]})
+`, d => d.m.some(v => v > 5) && d.m.slice(-1)[0] > 5 && d.tp && d.tp !== '–∞' && d.cold[0] === 0
+      ? { pass: true, detail: `strip meters ${d.m.map(v => v.toFixed(0) + '%').join('/')} at TP ${d.tp} dB; muting the only audible track drops it to 0%` }
+      : { pass: false, detail: `live=${show(d.m)} tp=${show(d.tp)} muted=${show(d.cold)} mutedTp=${show(d.coldTp)}` })
+
 step(11, 'select all, copy, paste, delete and undo work from the keys', `
 probe("document.body.focus()")
 base = probe("return JSON.stringify({clips:document.querySelectorAll('#lane .clip').length})")
