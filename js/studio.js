@@ -406,7 +406,11 @@ export function attach(app) {
       if (db) db.textContent = t.volumeDb.toFixed(1)
       document.querySelectorAll(`[data-vol="${t.id}"]`).forEach((x) => { if (x !== el) x.value = String(t.volumeDb) })
       const dock = $('in-track-vol')
-      if (dock && t.id === state.active) dock.value = String(t.volumeDb)
+      if (dock && t.id === state.active) {
+        dock.value = String(t.volumeDb)
+        // drives the fill on the fader track: the cap alone gave no level cue
+        dock.style.setProperty('--vf', `${((t.volumeDb + 60) / 66) * 100}%`)
+      }
     }
     if (el.dataset.pan) {
       const t = findTrack(el.dataset.pan)
