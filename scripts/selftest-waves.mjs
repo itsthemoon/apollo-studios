@@ -15,7 +15,8 @@ test('cache covers the buffer in order', () => {
   ok(cache.bucketSize >= 1, 'bucket size is at least one sample')
   eq(cache.len, buf.length, 'length recorded')
   near(cache.bucketSize * cache.count, buf.length, cache.bucketSize, 'buckets cover every sample')
-  ok(cache.ref > 0.7 && cache.ref <= 0.81, `ref tracks the loudest sample (${cache.ref})`)
+  // the window sits 2.9 dB under the true peak so limited material keeps shape
+  ok(cache.ref > 0.5 && cache.ref <= 0.81, `ref sits just under the loudest sample (${cache.ref})`)
 })
 
 test('bucket count is capped, not the bucket size', () => {

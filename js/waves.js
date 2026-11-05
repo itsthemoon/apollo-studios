@@ -38,7 +38,9 @@ export function buildCache(data, rate) {
     sumsq[b] = s
     if (p > ref) ref = p
   }
-  return { peak, sumsq, count, bucketSize, len, rate: Number(rate) || 0, ref: Math.max(ref, 1e-4) }
+  /* the window is referenced below the true peak: a limited take lives within a
+     couple of dB of it, and referencing the peak itself drew a flat wall */
+  return { peak, sumsq, count, bucketSize, len, rate: Number(rate) || 0, ref: Math.max(ref * 0.72, 1e-4) }
 }
 
 /** How many beats a take of `seconds` occupies at `bpm` — its layout span. */

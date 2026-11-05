@@ -203,8 +203,10 @@ function drawTake(canvas, take) {
   const DB = 24
   let ref = 0
   for (let i = 0; i < take.length; i += Math.max(1, Math.floor(take.length / 4096))) ref = Math.max(ref, Math.abs(take[i]))
-  ref = Math.max(ref, 1e-4)
-  const d = (v) => Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6) / ref) + DB) / DB))
+  ref = Math.max(ref * 0.72, 1e-4)
+  /* the dB window compresses peaks into a wall on limited material; a gamma
+     below 1 on the *dB* value keeps loud detail apart without losing the floor */
+  const d = (v) => Math.pow(Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6) / ref) + DB) / DB)), 1.6)
   const rms = new Float32Array(canvas.width)
   const peaks = new Float32Array(canvas.width)
   for (let x = 0; x < canvas.width; x++) {
@@ -393,7 +395,7 @@ function drawRegionWave(track, clip, region) {
   const mid = height / 2
   const { ref } = cache
   // same 24 dB window as drawTake, referenced to the take's own peak
-  const lit = (v) => Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6) / ref) + 24) / 24))
+  const lit = (v) => Math.pow(Math.min(1, Math.max(0, (20 * Math.log10(Math.max(v, 1e-6) / ref) + 24) / 24)), 1.6)
 
   /* Brightness carries the fades: columns are grouped into 16 ramp steps so a
      whole region is a handful of paths instead of one per column. */
