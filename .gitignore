@@ -2,3 +2,4 @@
 node_modules/
 *.wav
 .DS_Store
+!assets/skin.wav
