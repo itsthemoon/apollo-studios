@@ -37,6 +37,7 @@
       </p>
       <div class="cta">
         <a class="btn primary" href="app.html">Open the studio</a>
+        <a class="btn" id="hosted" href="https://itsthemoon.github.io/apollo-studios/app.html">Hosted copy ↗</a>
         <a class="btn" href="docs/getting-started.html">Read the setup</a>
         <span class="note">Runs offline once served.</span>
       </div>
@@ -105,5 +106,6 @@
     </div>
   </div>
 </footer>
+<script>if (location.hostname.endsWith('github.io')) document.getElementById('hosted').remove()</script>
 </body>
 </html>
