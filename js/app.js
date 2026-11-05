@@ -11,6 +11,7 @@ import * as stems from './stems.js'
 import * as beat from './beat.js'
 import * as compose from './compose.js'
 import * as automix from './automix.js'
+import * as tracks from './tracks.js'
 import { masterChain } from './master.js'
 import { encodeWav } from './wav.js'
 import { attach as attachStudio } from './studio.js'
@@ -841,7 +842,14 @@ async function playNotes(notes, opts = {}) {
   const buffer = ctx.createBuffer(1, src0.length, state.sampleRate)
   buffer.copyToChannel(src0, 0)
   const gain = ctx.createGain()
-  gain.gain.value = Math.pow(10, (Number($('in-gain').value) + (opts.gainDb || 0) + state.region.gainDb) / 20)
+  // the take plays through the active track's strip, so mute, solo and its fader
+  // apply — before this only the master and the region gain were in the path
+  const act = state.tracks?.find((t) => t.id === state.active)
+  const audible = !act || tracks.resolveSolo(state.tracks).has(act.id)
+  const stripDb = act?.volumeDb || 0
+  gain.gain.value = audible
+    ? Math.pow(10, (Number($('in-gain').value) + (opts.gainDb || 0) + state.region.gainDb + stripDb) / 20)
+    : 0
   gain.connect(ctx.destination)
   const now = ctx.currentTime + 0.06
   const spread = (opts.spreadMs || 0) / 1000

@@ -437,8 +437,8 @@ export function attach(app) {
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-mute], [data-solo], [data-arm], [data-track-menu], [data-fx]')
     if (!el) return
-    if (el.dataset.mute) { tracks.toggleMute(findTrack(el.dataset.mute)); syncTrackDom(findTrack(el.dataset.mute)); syncAudibility() }
-    else if (el.dataset.solo) { tracks.toggleSolo(findTrack(el.dataset.solo)); syncAll() }
+    if (el.dataset.mute) { tracks.toggleMute(findTrack(el.dataset.mute)); syncTrackDom(findTrack(el.dataset.mute)); syncAudibility(); replayIfPlaying() }
+    else if (el.dataset.solo) { tracks.toggleSolo(findTrack(el.dataset.solo)); syncAll(); replayIfPlaying() }
     else if (el.dataset.arm) {
       const t = findTrack(el.dataset.arm)
       tracks.toggleArm(t)
@@ -459,6 +459,11 @@ export function attach(app) {
     const t = findTrack(box?.dataset.track)
     if (t) { tracks.rename(t, n.textContent.trim() || tracks.typeInfo(t.type).label); syncTrackDom(t) }
   })
+
+  // the take's gain is fixed at play time, so a mute or solo has to re-cut it
+  function replayIfPlaying() {
+    if (state.playing.length) $('in-gain').dispatchEvent(new Event('input'))
+  }
 
   function syncAudibility() {
     const audible = tracks.resolveSolo(state.tracks)
@@ -601,14 +606,16 @@ export function attach(app) {
         </span>
         <button class="insert${inserts ? ' loaded' : ''}" type="button" data-insert="${t.id}"
           aria-label="${escapeHtml(t.name)} insert chain: ${inserts} ${inserts === 1 ? 'effect' : 'effects'}">fx ${inserts}</button>
-        <input type="range" min="-60" max="6" value="${t.volumeDb}" step="0.5" aria-label="${escapeHtml(t.name)} fader" data-vol="${t.id}">
-        <span class="db">${t.volumeDb.toFixed(1)}</span>
+        <span class="fader-row">
+          <input type="range" min="-60" max="6" value="${t.volumeDb}" step="0.5" aria-label="${escapeHtml(t.name)} fader" data-vol="${t.id}" title="Volume — double-click to reset">
+          <span class="strip-meter" data-meter="${t.id}" aria-hidden="true"><i></i></span>
+        </span>
+        <span class="db">${t.volumeDb.toFixed(1)} dB</span>
         <span class="mstag"><button class="ms" type="button" aria-label="Mute ${escapeHtml(t.name)}" data-mute="${t.id}" aria-pressed="${t.mute}">M</button>
         <button class="ms" type="button" aria-label="Solo ${escapeHtml(t.name)}" data-solo="${t.id}" aria-pressed="${t.solo}">S</button></span>
         <span class="mlab">pan</span>
         <input class="strippan" type="range" min="-100" max="100" value="${t.pan * 100}" aria-label="${escapeHtml(t.name)} pan — double-click to centre" title="Pan — double-click to centre" data-pan="${t.id}">
-        <span class="db" data-pan-read="${t.id}">${panReadout(t.pan)}</span>
-        <span class="strip-meter" data-meter="${t.id}" aria-hidden="true"><i></i></span>`
+        <span class="db" data-pan-read="${t.id}">${panReadout(t.pan)}</span>`
       host.append(s)
     })
     const m = document.createElement('div')
@@ -616,8 +623,11 @@ export function attach(app) {
     m.innerHTML = `<b>Master</b>
       <span class="master-read"><span class="tp">TP <output data-tp>–∞</output> dB</span>
       <span class="gr">LIM <output data-gr>0.0</output> dB</span></span>
-      <input type="range" min="-12" max="12" value="${$('in-gain').value}" aria-label="Master fader"><span class="db">${$('out-gain').textContent}</span>
-      <span class="strip-meter master-meter" data-meter="master" aria-hidden="true"><i></i></span>`
+      <span class="fader-row">
+        <input type="range" min="-12" max="12" value="${$('in-gain').value}" aria-label="Master fader" title="Master volume">
+        <span class="strip-meter master-meter" data-meter="master" aria-hidden="true"><i></i></span>
+      </span>
+      <span class="db">${$('out-gain').textContent}</span>`
     m.querySelector('input').addEventListener('input', (e) => { $('in-gain').value = e.target.value; $('in-gain').dispatchEvent(new Event('input')) })
     host.append(m)
     paintMeters()
@@ -660,13 +670,20 @@ export function attach(app) {
   const meterBuf = new Float32Array(1024)
   const dbToN = (db) => Math.min(1, Math.max(0, (db + 60) / 60))
 
-  function meterContext() { return transport.ctx || state.ctx }
+  // two engines can own playback (plain play in app.js, loop play here); the
+  // analyser has to sit on whichever one is actually running
+  function meterContext() {
+    const a = transport.ctx
+    const b = state.ctx
+    if (a && b) return a.state === 'running' && b.state !== 'running' ? a : b
+    return a || b
+  }
   function attachAnalyser() {
     const ctx = meterContext()
     if (!ctx) return null
     if (analyser && analyser.context === ctx) {
       // a fresh play() creates new sources; tap whichever ones aren't yet
-      state.playing.forEach(tapSource)
+      allSources().forEach(tapSource)
       return analyser
     }
     try {
@@ -677,14 +694,26 @@ export function attach(app) {
       meterSink.gain.value = 0
       analyser.connect(meterSink).connect(ctx.destination)
     } catch { analyser = null; return null }
-    state.playing.forEach(tapSource)
+    allSources().forEach(tapSource)
     return analyser
   }
 
-  function tapSource(src) { if (analyser && src) { try { src.connect(analyser) } catch { /* noop */ } } }
+  const tapped = new WeakSet()
+  function tapSource(src) {
+    if (!analyser || !src || tapped.has(src) || src.context !== analyser.context) return
+    try { src.connect(analyser); tapped.add(src) } catch { /* gone already */ }
+  }
+  const allSources = () => [...(state.playing || []), ...(transport.sources || [])]
 
   function paintMeters() {
-    if (!analyser || $('mixer')?.hidden) return
+    if ($('mixer')?.hidden) return
+    // play() may still be awaiting the worklet when the tap is queued, so keep
+    // trying while the context exists instead of giving up on the first frame
+    if (!analyser && meterContext()) attachAnalyser()
+    if (!analyser) return
+    // sources are created asynchronously after the click, so pick up new ones
+    allSources().forEach(tapSource)
+    if (meterContext()?.state === 'suspended') meterContext().resume().catch(() => {})
     const buf = meterBuf
     analyser.getFloatTimeDomainData(buf)
     let peak = 0
@@ -711,13 +740,13 @@ export function attach(app) {
       if (!bar) return
       const factor = audible.has(t.id) ? 10 ** (t.volumeDb / 20) * (1 - Math.abs(t.pan) * 0.3) : 0
       const n = Math.min(1, rmsN * factor)
-      bar.style.width = `${(n * 100).toFixed(1)}%`
+      bar.style.height = `${(n * 100).toFixed(1)}%`
       bar.dataset.zone = n > 0.92 ? 'clip' : n > 0.72 ? 'warn' : 'ok'
     })
     const master = document.querySelector('[data-meter="master"] i')
     if (master) {
       const n = dbToN(20 * Math.log10(Math.max(tp, 1e-6)))
-      master.style.width = `${(n * 100).toFixed(1)}%`
+      master.style.height = `${(n * 100).toFixed(1)}%`
       master.dataset.zone = n > 0.97 ? 'clip' : n > 0.8 ? 'warn' : 'ok'
       const tpOut = document.querySelector('[data-tp]')
       if (tpOut) tpOut.textContent = tp > 1e-5 ? (20 * Math.log10(tp)).toFixed(1) : '–∞'
@@ -731,17 +760,20 @@ export function attach(app) {
   function meterLoop() {
     meterRaf = 0
     if (!state.playing.length && !transport.playing) {
-      document.querySelectorAll('[data-meter] i').forEach((b) => { b.style.width = '0%' })
+      document.querySelectorAll('[data-meter] i').forEach((b) => { b.style.height = '0%' })
       const tpOut = document.querySelector('[data-tp]')
       if (tpOut) tpOut.textContent = '–∞'
       const gr = document.querySelector('[data-gr]')
       if (gr) gr.textContent = '0.0'
+      // keep the loop alive while the mixer is open: play() is async, so the
+      // first frames arrive with nothing to read yet
+      if (!$('mixer')?.hidden) meterRaf = requestAnimationFrame(meterLoop)
       return
     }
     paintMeters()
     meterRaf = requestAnimationFrame(meterLoop)
   }
-  function startMeter() {
+  function startStripMeters() {
     attachAnalyser()
     if (!meterRaf) meterRaf = requestAnimationFrame(meterLoop)
   }
@@ -2322,22 +2354,24 @@ export function attach(app) {
     $('btn-stop').disabled = false
     app.status(`looping ${spec.from.toFixed(2)}–${spec.to.toFixed(2)} beats`)
     metroStart(spec.from)
-    startMeter()
+    startStripMeters()
   }
 
-  document.addEventListener('click', (e) => {
-    if (!e.target.closest('#btn-play')) return
+  // bound to the button, not the document: a delegated click here never ran
+  $('btn-play').addEventListener('click', (e) => {
+    window.__rafProbe = 'hit'
     const spec = loopBeats()
     if (!spec || !state.notes.length) {
       // app.js owns plain playback; let it start, then tap the sources for the
       // meters once they exist
-      setTimeout(() => { attachAnalyser(); startMeter() }, 80)
+      setTimeout(() => { attachAnalyser(); startStripMeters() }, 80)
       return
     }
     e.preventDefault()
     e.stopPropagation()
     if (transport.playing) { stopLoopPlay(); app.status('stopped'); return }
     startLoopPlay(spec)
+    setTimeout(() => { attachAnalyser(); startStripMeters() }, 80)
   }, true)
 
   $('btn-stop').addEventListener('click', () => {
